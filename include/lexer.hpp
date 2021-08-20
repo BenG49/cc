@@ -1,14 +1,13 @@
 #pragma once
 
-#include <fstream>
 #include <cstdint>
-#include <string>
+#include <vector>
 
 enum TokType {
 	TOK_EOF,
 
 	// first 255 are ascii symbols
-	TOK_VAL_INTEGER=256,
+	TOK_VAL_INT=256,
 	TOK_VAL_FLOAT,
 	TOK_ID_IF,
 	TOK_ID_ELSE,
@@ -22,30 +21,56 @@ enum TokType {
 	TOK_TYPE_ENUM,
 	TOK_TYPE_UNS,
 	TOK_TYPE_LONG,
+	TOK_ENUM_LEN
+};
+
+// starts at 256
+const char *tok_names[TOK_ENUM_LEN - 256] = {
+	"integer",
+	"float",
+	"\"if\"",
+	"\"else\"",
+	"\"for\"",
+	"\"while\"",
+	"\"const\"",
+	"\"void\"",
+	"\"int\"",
+	"\"float\"",
+	"\"char\"",
+	"\"enum\"",
+	"\"unsigned\"",
+	"\"long\""
 };
 
 struct Token {
-	TokType type;
-
-	int line, col;
-
-	union val {
+	union TokVal {
 		std::uint64_t i;
 		double f;
 		const char *str;
 	};
+
+	TokType type;
+
+	int line, col, char_count;
+
+	union TokVal v;
 };
 
 class Lexer
 {
-	char * buf;
+	int index, line, col;
+	char *buf;
+	std::vector<Token> tok_buf;
+
+	Token next();
+	int inc_idx();
 
 public:
-	Lexer(std::ifstream file);
+	Lexer(const std::string &filename);
 	~Lexer();
 
 	void eat(TokType expected);
-	Token next();
+	Token peek_next();
+	// lookahead must be > 0
 	Token peek(unsigned lookahead);
 };
-

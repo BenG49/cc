@@ -1,5 +1,4 @@
 CC=g++
-#CFLAGS=-Wall -O2 -Iinclude -std=c++17
 CFLAGS=-Wall -Iinclude -std=c++17
 
 SRCS=$(shell find ./src/ -type f -name '*.cpp')
@@ -8,7 +7,7 @@ OBJS=${SRCS:.cpp=.o}
 
 TARGET=a.out
 
-.PHONY: run
+.PHONY: run clean
 
 $(TARGET): $(OBJS) $(HDRS) main.cpp
 	$(CC) $(CFLAGS) -o $@ $(OBJS) main.cpp
