@@ -9,5 +9,6 @@ int main(int argc, const char *argv[])
 		err("No input file specified");
 	
 	Lexer l(argv[1]);
+	std::cout << l.seq_eq("else") << '\n';
 }
 

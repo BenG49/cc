@@ -2,49 +2,30 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 enum TokType {
 	TOK_EOF,
 
 	// first 255 are ascii symbols
-	TOK_VAL_INT=256,
-	TOK_VAL_FLOAT,
-	TOK_ID_IF,
-	TOK_ID_ELSE,
-	TOK_ID_FOR,
-	TOK_ID_WHILE,
-	TOK_ID_CONST,
+	TOK_VAL_INT=256,//
+	TOK_VAL_FLOAT,//
+	TOK_ID_IF,//
+	TOK_ID_ELSE,//
+	TOK_ID_FOR,//
+	TOK_ID_WHILE,//
+	TOK_ID_CONST,//
 	TOK_TYPE_VOID,
-	TOK_TYPE_INT,
-	TOK_TYPE_FLOAT,
+	TOK_TYPE_INT,//
+	TOK_TYPE_FLOAT,//
 	TOK_TYPE_CHAR,
-	TOK_TYPE_ENUM,
-	TOK_TYPE_UNS,
-	TOK_TYPE_LONG,
 	TOK_ENUM_LEN
-};
-
-// starts at 256
-const char *tok_names[TOK_ENUM_LEN - 256] = {
-	"integer",
-	"float",
-	"\"if\"",
-	"\"else\"",
-	"\"for\"",
-	"\"while\"",
-	"\"const\"",
-	"\"void\"",
-	"\"int\"",
-	"\"float\"",
-	"\"char\"",
-	"\"enum\"",
-	"\"unsigned\"",
-	"\"long\""
 };
 
 struct Token {
 	union TokVal {
-		std::uint64_t i;
+		int i;
+		std::uint64_t l;
 		double f;
 		const char *str;
 	};
@@ -65,11 +46,13 @@ class Lexer
 	char *buf;
 	std::vector<Token> tok_buf;
 
+public:
 	Token next();
 	void inc_idx();
-	void inc_idx_(int count);
+	void inc_seq(int count);
+	bool seq_eq(const char *seq);
 
-public:
+// public:
 	Lexer(const std::string &filename);
 	~Lexer();
 
