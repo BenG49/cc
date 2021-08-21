@@ -54,6 +54,9 @@ struct Token {
 	int line, col, char_count;
 
 	union TokVal v;
+
+	Token(TokType type, int line, int col, int char_count, union TokVal v = (TokVal){})
+		: type(type), line(line), col(col), char_count(char_count), v(v) {}
 };
 
 class Lexer
@@ -63,7 +66,8 @@ class Lexer
 	std::vector<Token> tok_buf;
 
 	Token next();
-	int inc_idx();
+	void inc_idx();
+	void inc_idx_(int count);
 
 public:
 	Lexer(const std::string &filename);

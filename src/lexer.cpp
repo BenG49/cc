@@ -84,22 +84,36 @@ Token Lexer::next()
 			// TODO: check if this is right
 			num_buf[len] = '\0';
 
-			Token t = {
-				.type = f ? TOK_VAL_FLOAT : TOK_VAL_INT,
-				.line = line,
-				.col = col,
-				.char_count = len,
-				.v = { .i = std::stoi(num_buf) }
-			};
+			Token t(
+				f ? TOK_VAL_FLOAT : TOK_VAL_INT,
+				line,
+				col,
+				len,
+				(Token::TokVal){ .i = std::stoi(num_buf) }
+			);
 
 			delete[] num_buf;
 
 			return t;
 		}
+		// TOK_ID_IF, TOK_TYPE_INT
+		else if (cur == 'i')
+		{
+			char next = buf[index + 1];
+			if (next == 'f')
+			{
+				inc_idx();
+				return Token(TOK_ID_IF, line, col, 2);
+			}
+			else if (next == 'n' && buf[index + 2] == 't')
+			{
+				inc_idx();
+			}
+		}
 	}
 }
 
-int Lexer::inc_idx()
+void Lexer::inc_idx()
 {
 	++index;
 	++col;
@@ -112,11 +126,14 @@ int Lexer::inc_idx()
 		col = 0;
 	}
 
+	// TODO: add EOF checking
 	// if (cur == '\0')
 	// {
 
 	// }
 }
+
+void inc_idx_(int count);
 
 Token Lexer::peek_next()
 {
