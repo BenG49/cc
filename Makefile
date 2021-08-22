@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Iinclude -std=c++17
+CFLAGS=-Wall -Iinclude -std=c++17 -g
 
 SRCS=$(shell find ./src/ -type f -name '*.cpp')
 HDRS=$(shell find ./include/ -type f -name '*.hpp')

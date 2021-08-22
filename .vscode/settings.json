@@ -1,5 +1,5 @@
 {
-    "window.zoomLevel": 0.6,
+    "window.zoomLevel": 1,
     "files.associations": {
         "array": "cpp",
         "atomic": "cpp",
