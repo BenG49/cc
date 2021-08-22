@@ -48,13 +48,12 @@ class Lexer
 	char *buf;
 	std::deque<Token> tok_buf;
 
-public:
 	Token next();
 	int inc_seq(int count);
 	int inc_idx();
 	bool seq_eq(const char *seq);
 
-// public:
+public:
 	Lexer(const std::string &filename);
 	~Lexer();
 
@@ -62,4 +61,6 @@ public:
 	Token peek_next();
 	// lookahead must be > 0
 	Token peek(unsigned lookahead);
+
+	bool has_next() const;
 };
