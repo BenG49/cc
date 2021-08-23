@@ -9,71 +9,73 @@
 
 #include <util/err.hpp>
 
-const std::regex REGEX[TOKTYPE_LEN - 256] = {
-	std::regex("^auto"),
-	std::regex("^_Bool"),
-	std::regex("^break"),
-	std::regex("^case"),
-	std::regex("^char"),
-	std::regex("^_Complex"),
-	std::regex("^const"),
-	std::regex("^continue"),
-	std::regex("^default"),
-	std::regex("^do"),
-	std::regex("^double"),
-	std::regex("^else"),
-	std::regex("^enum"),
-	std::regex("^extern"),
-	std::regex("^float"),
-	std::regex("^for"),
-	std::regex("^goto"),
-	std::regex("^if"),
-	std::regex("^_Imaginary"),
-	std::regex("^inline"),
-	std::regex("^int"),
-	std::regex("^long"),
-	std::regex("^register"),
-	std::regex("^restrict"),
-	std::regex("^short"),
-	std::regex("^signed"),
-	std::regex("^sizeof"),
-	std::regex("^static"),
-	std::regex("^struct"),
-	std::regex("^switch"),
-	std::regex("^typedef"),
-	std::regex("^union"),
-	std::regex("^unsigned"),
-	std::regex("^void"),
-	std::regex("^volatile"),
-	std::regex("^while"),
+const TokType STR_TOK_LEN = TOKTYPE_LEN;
 
-	std::regex("^..."),
-	std::regex("^>>="),
-	std::regex("^<<="),
-	std::regex("^+="),
-	std::regex("^-="),
-	std::regex("^*="),
-	std::regex("^/="),
-	std::regex("^%="),
-	std::regex("^&="),
-	std::regex("^^="),
-	std::regex("^|="),
-	std::regex("^>>"),
-	std::regex("^<<"),
-	std::regex("^++"),
-	std::regex("^--"),
-	std::regex("^->"),
-	std::regex("^&&"),
-	std::regex("^||"),
-	std::regex("^<="),
-	std::regex("^>="),
-	std::regex("^=="),
-	std::regex("^!="),
+const char *STR_TOKENS[STR_TOK_LEN - 256] = {
+	"auto",
+	"_Bool",
+	"break",
+	"case",
+	"char",
+	"_Complex",
+	"const",
+	"continue",
+	"default",
+	"do",
+	"double",
+	"else",
+	"enum",
+	"extern",
+	"float",
+	"for",
+	"goto",
+	"if",
+	"_Imaginary",
+	"inline",
+	"int",
+	"long",
+	"register",
+	"restrict",
+	"short",
+	"signed",
+	"sizeof",
+	"static",
+	"struct",
+	"switch",
+	"typedef",
+	"union",
+	"unsigned",
+	"void",
+	"volatile",
+	"while",
+
+	"...",
+	">>=",
+	"<<=",
+	"+=",
+	"-=",
+	"*=",
+	"/=",
+	"%=",
+	"&=",
+	"^=",
+	"|=",
+	">>",
+	"<<",
+	"++",
+	"--",
+	"->",
+	"&&",
+	"||",
+	"<=",
+	">=",
+	"==",
+	"!=",
 };
 
 const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.?:";
 
-// FIXME: doesn't work completely, no f and potentially wrong
+// FIXME: doesn't work completely, no f suffix and potentially wrong
 const std::regex NUMERIC_LITERAL("(0[xX][A-Fa-f0-9]+|0[bB][01]+|0[0-7]+|[0-9]*\.?[0-9]+[fuLl]?)([uU]?[lL]{0,2})");
 
 Lexer::Lexer(const std::string &filename)
@@ -145,14 +147,9 @@ Token Lexer::next()
 		// check for numeric constant
 
 
-		std::cmatch m;
 		int index = 0;
-		for (int i = 256; i < TOKTYPE_LEN; ++i, ++index)
+		for (int i = 256; i < STR_TOK_LEN; ++i, ++index)
 		{
-			if (std::regex_search(buf + index, m, REGEX[index]))
-			{
-				
-			}
 		}
 		
 		/*std::stringstream e;

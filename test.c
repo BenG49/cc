@@ -1,9 +1,10 @@
 int function(int i)
 {
-    return 4 + i * 2;
+	int i = 10;
+	return 4 + i * 2;
 }
 
 int main()
 {
-    return function(10);
+	return function(10);
 }
