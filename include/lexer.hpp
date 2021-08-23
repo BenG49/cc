@@ -6,22 +6,69 @@
 #include <deque>
 
 enum TokType {
-	TOK_EOF,
+	// ascii values 0 - 255
 
-	// first 255 are ascii symbols
-	TOK_VAL_INT=256,
-	TOK_VAL_FLOAT,
-	TOK_IDENTIFIER,
-	TOK_ID_IF,
-	TOK_ID_ELSE,
-	TOK_ID_FOR,
-	TOK_ID_WHILE,
-	TOK_ID_CONST,
-	TOK_TYPE_VOID,
-	TOK_TYPE_INT,
-	TOK_TYPE_FLOAT,
-	TOK_TYPE_CHAR,
-	TOK_ENUM_LEN
+	KEY_AUTO = 256,
+	KEY_BOOL,
+	KEY_BREAK,
+	KEY_CASE,
+	KEY_CHAR,
+	KEY_COMPLEX,
+	KEY_CONST,
+	KEY_CONTINUE,
+	KEY_DEFAULT,
+	KEY_DO,
+	KEY_DOUBLE,
+	KEY_ELSE,
+	KEY_ENUM,
+	KEY_EXTERN,
+	KEY_FLOAT,
+	KEY_FOR,
+	KEY_GOTO,
+	KEY_IF,
+	KEY_IMAGINARY,
+	KEY_INLINE,
+	KEY_INT,
+	KEY_LONG,
+	KEY_REGISTER,
+	KEY_RESTRICT,
+	KEY_SHORT,
+	KEY_SIGNED,
+	KEY_SIZEOF,
+	KEY_STATIC,
+	KEY_STRUCT,
+	KEY_SWITCH,
+	KEY_TYPEDEF,
+	KEY_UNION,
+	KEY_UNSIGNED,
+	KEY_VOID,
+	KEY_VOLATILE,
+	KEY_WHILE,
+
+	OP_ELLIPSIS,
+	OP_SHR_SET,
+	OP_SHL_SET,
+	OP_ADD_SET,
+	OP_SUB_SET,
+	OP_MUL_SET,
+	OP_DIV_SET,
+	OP_MOD_SET,
+	OP_AND_SET,
+	OP_XOR_SET,
+	OP_OR_SET,
+	OP_SHR,
+	OP_SHL,
+	OP_INC,
+	OP_DEC,
+	OP_PTR,
+	OP_AND,
+	OP_OR,
+	OP_LE,
+	OP_GE,
+	OP_EQ,
+	OP_NE,
+
+	TOKTYPE_LEN
 };
 
 struct Token {
@@ -49,9 +96,8 @@ class Lexer
 	std::deque<Token> tok_buf;
 
 	Token next();
-	int inc_seq(int count);
-	int inc_idx();
-	bool seq_eq(const char *seq);
+	int count_(int count);
+	int count();
 
 public:
 	Lexer(const std::string &filename);

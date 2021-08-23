@@ -1,33 +1,80 @@
 #include <lexer.hpp>
 
-#include <iostream>
-
 #include <fstream>
 #include <sstream>
 #include <cstring>
 #include <string>
 #include <limits>
+#include <regex>
 
 #include <util/err.hpp>
 
-// starts at 256
-const char *TOK_NAMES[TOK_ENUM_LEN - 256] = {
-	"integer",
-	"float",
-	"identifier",
-	"if",
-	"else",
-	"for",	// 260
-	"while",
-	"const",
-	"void",
-	"int",
-	"float",
-	"char",
+const std::regex REGEX[TOKTYPE_LEN - 256] = {
+	std::regex("^auto"),
+	std::regex("^_Bool"),
+	std::regex("^break"),
+	std::regex("^case"),
+	std::regex("^char"),
+	std::regex("^_Complex"),
+	std::regex("^const"),
+	std::regex("^continue"),
+	std::regex("^default"),
+	std::regex("^do"),
+	std::regex("^double"),
+	std::regex("^else"),
+	std::regex("^enum"),
+	std::regex("^extern"),
+	std::regex("^float"),
+	std::regex("^for"),
+	std::regex("^goto"),
+	std::regex("^if"),
+	std::regex("^_Imaginary"),
+	std::regex("^inline"),
+	std::regex("^int"),
+	std::regex("^long"),
+	std::regex("^register"),
+	std::regex("^restrict"),
+	std::regex("^short"),
+	std::regex("^signed"),
+	std::regex("^sizeof"),
+	std::regex("^static"),
+	std::regex("^struct"),
+	std::regex("^switch"),
+	std::regex("^typedef"),
+	std::regex("^union"),
+	std::regex("^unsigned"),
+	std::regex("^void"),
+	std::regex("^volatile"),
+	std::regex("^while"),
+
+	std::regex("^..."),
+	std::regex("^>>="),
+	std::regex("^<<="),
+	std::regex("^+="),
+	std::regex("^-="),
+	std::regex("^*="),
+	std::regex("^/="),
+	std::regex("^%="),
+	std::regex("^&="),
+	std::regex("^^="),
+	std::regex("^|="),
+	std::regex("^>>"),
+	std::regex("^<<"),
+	std::regex("^++"),
+	std::regex("^--"),
+	std::regex("^->"),
+	std::regex("^&&"),
+	std::regex("^||"),
+	std::regex("^<="),
+	std::regex("^>="),
+	std::regex("^=="),
+	std::regex("^!="),
 };
 
-const TokType TOK_KEYWORDS_START = TOK_ID_IF;
+const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.?:";
 
+// FIXME: doesn't work completely, no f and potentially wrong
+const std::regex NUMERIC_LITERAL("(0[xX][A-Fa-f0-9]+|0[bB][01]+|0[0-7]+|[0-9]*\.?[0-9]+[fuLl]?)([uU]?[lL]{0,2})");
 
 Lexer::Lexer(const std::string &filename)
 	: index(0)
@@ -67,9 +114,9 @@ void Lexer::eat(TokType expected)
 	{
 		std::stringstream out;
 		out << "Invalid token: expected "
-			<< TOK_NAMES[expected - 256]
+			/*<< REGEX[expected - 256]
 			<< ", got "
-			<< TOK_NAMES[next.type - 256];
+			<< REGEX[next.type - 256]*/;
 
 		err(out.str());
 	}
@@ -84,102 +131,45 @@ Token Lexer::next()
 	for (;;)
 	{
 		char cur = buf[index];
+
+		// check single char constants
+		const char *ptr = CHAR_TOKENS;
+		while (*ptr)
+			if (cur == *ptr++)
+			{
+				Token out(static_cast<TokType>(cur), line, col, 1);
+				count();
+				return out;
+			}
 		
-		if (cur == ' ' || cur == '\t' || cur == '\n')
-			inc_idx();
-		// int, long, float, double
-		else if (std::isdigit(cur) || cur == '.')
+		// check for numeric constant
+
+
+		std::cmatch m;
+		int index = 0;
+		for (int i = 256; i < TOKTYPE_LEN; ++i, ++index)
 		{
-			int start = index;
-			bool f = false;
-
-			do {
-				if (cur == '.') f = true;
-				cur = buf[inc_idx()];
-			} while (std::isdigit(cur) || cur == '.');
-			
-			int len = index - start;
-			char *num_buf = new char[len + 1];
-			// copy the number into the buffer
-			std::memcpy(num_buf, buf + start, len);
-
-			num_buf[len] = '\0';
-
-			Token t(TOK_VAL_INT, line, col, len);
-
-			if (f)
+			if (std::regex_search(buf + index, m, REGEX[index]))
 			{
-				t.type = TOK_VAL_FLOAT;
-				t.val.f = std::stof(num_buf);
-			}
-			else
-				t.val.i = std::stoi(num_buf);
-
-			// delete temporary number buffer
-			delete[] num_buf;
-
-			return t;
-		}
-		else
-		{
-			int index = TOK_KEYWORDS_START - 256;
-			// loop through all keywords
-			for (int type = TOK_KEYWORDS_START; type < TOK_ENUM_LEN; ++type, ++index)
-			{
-				if (seq_eq(TOK_NAMES[index]))
-				{
-					int len = std::strlen(TOK_NAMES[index]);
-					inc_seq(len);
-					return Token(static_cast<TokType>(type), line, col, len);
-				}
-			}
-
-			// get identifier
-			if (std::islower(cur) || std::islower(cur) || cur == '_')
-			{
-				int start = index;
 				
-				// inc until end of identifier
-				do cur = buf[inc_idx()];
-				while (std::islower(cur) || std::islower(cur) || cur == '_' || std::isdigit(cur));
-
-				int len = start - index;
-				// TODO: figure out why deallocating in deconstructor of token throws double free
-				char *str = new char[len + 1];
-
-				// copy identifier
-				std::memcpy(str, buf + start, len);
-
-				str[len] = '\0';
-
-				return Token(TOK_IDENTIFIER, line, col, len, (Token::TokVal){ .s = str });
 			}
-
-			if (cur == '\0')
-				return Token(TOK_EOF, line, col, 0);
-			
-			// TODO: check if this is right
-			Token out(static_cast<TokType>(cur), line, col, 1);
-			inc_idx();
-			return out;
-
-			// none of keywords matched
-			/*std::stringstream e;
-			e << "Invalid character \'"
-				<< cur
-				<< "\' at line "
-				<< line
-				<< ", col "
-				<< col;
-
-			err(e.str());*/
 		}
+		
+		/*std::stringstream e;
+		e << "Invalid character \'"
+			<< cur
+			<< "\' at line "
+			<< line
+			<< ", col "
+			<< col;
+
+		err(e.str());*/
 	}
 }
 
-int Lexer::inc_idx() { return inc_seq(1); }
+int Lexer::count() { return count_(1); }
 // assumes that there are no newlines between index and index + count
-int Lexer::inc_seq(int count)
+int Lexer::count_(int count)
 {
 	index += count;
 	col += count;
@@ -192,19 +182,6 @@ int Lexer::inc_seq(int count)
 	}
 
 	return index;
-}
-
-bool Lexer::seq_eq(const char *seq)
-{
-	int count = 0;
-
-	while (*seq)
-	{
-		if (*seq++ != buf[index + count++])
-			return false;
-	}
-	
-	return true;
 }
 
 Token Lexer::peek_next() { return Lexer::peek(1); }
