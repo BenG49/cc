@@ -6,7 +6,8 @@
 #include <deque>
 
 enum TokType {
-	// ascii values 0 - 255
+	TOK_EOF,
+	// ascii values
 
 	KEY_AUTO = 256,
 	KEY_BOOL,
@@ -68,6 +69,10 @@ enum TokType {
 	OP_EQ,
 	OP_NE,
 
+	IDENTIFIER,
+	INT_LITERAL,
+	FLOAT_LITERAL,
+
 	TOKTYPE_LEN
 };
 
@@ -95,11 +100,15 @@ class Lexer
 	char *buf;
 	std::deque<Token> tok_buf;
 
-	Token next();
-	int count_(int count);
-	int count();
-
 public:
+	Token next();
+	int count(int count);
+	bool keyword(const char *keyword);
+	void blockcomment();
+
+	void lex_err(const std::string &msg);
+
+// public:
 	Lexer(const std::string &filename);
 	~Lexer();
 

@@ -3,5 +3,6 @@
 void err(const std::string &msg)
 {
 	std::cerr << "Error: " << msg << '\n';
-	exit(-1);
+
+	exit(1);
 }

@@ -1,4 +1,4 @@
-int function(int i)
+int/* function(int i)
 {
 	int i = 10;
 	return 4 + i * 2;
@@ -7,4 +7,4 @@ int function(int i)
 int main()
 {
 	return function(10);
-}
+}*/

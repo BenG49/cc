@@ -1,17 +1,17 @@
 #include <lexer.hpp>
 
 #include <fstream>
-#include <sstream>
-#include <cstring>
+#include <cctype>
 #include <string>
-#include <limits>
+// maybe later for stoi and stof
+// #include <limits>
 #include <regex>
 
 #include <util/err.hpp>
 
-const TokType STR_TOK_LEN = TOKTYPE_LEN;
+const int STR_TOK_LEN = INT_LITERAL - 256;
 
-const char *STR_TOKENS[STR_TOK_LEN - 256] = {
+const char *STR_TOKENS[STR_TOK_LEN] = {
 	"auto",
 	"_Bool",
 	"break",
@@ -76,12 +76,19 @@ const char *STR_TOKENS[STR_TOK_LEN - 256] = {
 const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.?:";
 
 // FIXME: doesn't work completely, no f suffix and potentially wrong
-const std::regex NUMERIC_LITERAL("(0[xX][A-Fa-f0-9]+|0[bB][01]+|0[0-7]+|[0-9]*\.?[0-9]+[fuLl]?)([uU]?[lL]{0,2})");
+const std::regex NUMERIC_LITERAL("^(0[xX][A-Fa-f0-9]+|0[bB][01]+|0[0-7]+|[0-9]*\\.?[0-9]+[fuLl]?)([uU]?[lL]{0,2})");
+const std::regex STRING_LITERAL("(u8|[uUlL])?\"(\\.|[^\\\"\n])*\"");
+
+// bad function, here for easier deletion later
+void debug(std::string a)
+{
+	std::cout << a << '\n';
+}
 
 Lexer::Lexer(const std::string &filename)
 	: index(0)
-	, line(0)
-	, col(0)
+	, line(1)
+	, col(1)
 {
 	std::ifstream file(filename, std::ifstream::binary);
 
@@ -133,52 +140,203 @@ Token Lexer::next()
 	for (;;)
 	{
 		char cur = buf[index];
+		debug("----------------");
+		std::cout << " line " << line
+		<< ", col " << col
+		<< '\n';
+
+		// has to be at the start, otherwise buffer overflow from buf[index + 1]
+		if (cur == '\0')
+			return Token(TOK_EOF, line, col, 0);
+
+		// ignored characters
+		if (cur == ' ' || cur == '\t' || cur == '\v' || cur == '\f')
+		{
+			debug("ignored");
+			count(1);
+			continue;
+		}
+
+		// check for comments
+		if (cur == '/')
+		{
+			char next = buf[index + 1];
+
+			if (next == '/')
+			{
+				debug("line comment");
+				int len = 0;
+				while (buf[index + len] != '\n') { ++len; }
+
+				count(len);
+				continue;
+			}
+			else if (next == '*')
+			{
+				debug("block comment");
+				blockcomment();
+				continue;
+			}
+		}
 
 		// check single char constants
 		const char *ptr = CHAR_TOKENS;
 		while (*ptr)
 			if (cur == *ptr++)
 			{
+				debug("single char literal");
 				Token out(static_cast<TokType>(cur), line, col, 1);
-				count();
+				count(1);
 				return out;
 			}
 		
 		// check for numeric constant
-
-
-		int index = 0;
-		for (int i = 256; i < STR_TOK_LEN; ++i, ++index)
+		std::cmatch match;
+		if ((std::isdigit(cur) || cur == '.') && std::regex_search(buf + index, match, NUMERIC_LITERAL))
 		{
+			debug("numeric constant");
+			// TODO: add backreference checking or sth for check for float
+			Token out(INT_LITERAL, line, col, match.str().size(), { .i = std::stoi(match.str()) });
+			count(match.str().size());
+			return out;
+		}
+
+		// check all keywords
+		for (int i = 0; i < STR_TOK_LEN; ++i)
+		{
+			if (keyword(STR_TOKENS[i]))
+			{
+				debug("found token");
+				int len = std::strlen(STR_TOKENS[i]);
+				Token out(static_cast<TokType>(i + 256), line, col, len);
+				count(len);
+				return out;
+			}
+		}
+
+		// try for a identifier
+		if (std::isalpha(cur))
+		{
+			debug("trying identifier");
+			int end = index;
+			do
+				cur = buf[++end];
+			while (std::isalnum(buf[end]) || std::isdigit(buf[end]));
+
+			int len = end - index;
+			char *str = new char[len + 1];
+
+			std::memcpy(str, buf + index, len);
+
+			str[len] = '\0';
+
+			std::cout << str << '\n';
+
+			Token out(IDENTIFIER, line, col, len, { .s =  str });
+			count(len);
+			return out;
 		}
 		
-		/*std::stringstream e;
-		e << "Invalid character \'"
-			<< cur
-			<< "\' at line "
-			<< line
-			<< ", col "
-			<< col;
-
-		err(e.str());*/
+		std::string s("Invalid character \'");
+		s += cur;
+		s += '\'';
+		lex_err(s);
 	}
 }
 
-int Lexer::count() { return count_(1); }
 // assumes that there are no newlines between index and index + count
-int Lexer::count_(int count)
+int Lexer::count(int count)
 {
 	index += count;
 	col += count;
+
 	char cur = buf[index];
 
 	if (cur == '\n')
 	{
-		++line;
-		col = 0;
+		col = 1;
+
+		while (cur == '\n')
+		{
+			++index;
+			++line;
+		}
 	}
+	else if (cur == '\t')
+		// 4 is the only respectable tab size
+		col += 4 - (col & 0b11);
 
 	return index;
+}
+
+bool Lexer::keyword(const char *keyword)
+{
+	const char *buf_ptr = buf + index;
+
+	while (*keyword && *buf_ptr)
+	{
+		if (*keyword++ != *buf_ptr++)
+			return false;
+	}
+
+	if (!*buf_ptr)
+		return false;
+
+	return true;
+}
+
+void Lexer::blockcomment()
+{
+	// 2 is for the /* to start the comment
+	const char *ptr = buf + index + 2;
+	char prev = *ptr;
+	char cur = *ptr;
+
+	int lines = 0;
+	// number of columns after last newline
+	int col_count = 0;
+
+	while (cur)
+	{
+		++col_count;
+
+		if (cur == '\n')
+		{
+			++lines;
+			col_count = 0;
+		}
+		// found ending
+		else if (prev == '*' && *ptr == '/')
+		{
+			count(buf + index - ptr);
+
+			if (lines)
+			{
+				col = col_count;
+				line += lines;
+			}
+
+			return;
+		}
+		else if (prev == '/' && *ptr == '*')
+			lex_err("Unterminated comment");
+
+		prev = *ptr++;
+		cur = *ptr;
+	}
+
+	// no terminator, reaches end of file
+	lex_err("Unterminated comment");
+}
+
+void Lexer::lex_err(const std::string &msg)
+{
+	std::cerr << "Error: " << msg
+		<< " at line " << line
+		<< ", col " << col
+		<< '\n';
+
+	exit(1);
 }
 
 Token Lexer::peek_next() { return Lexer::peek(1); }
