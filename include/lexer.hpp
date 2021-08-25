@@ -33,6 +33,7 @@ enum TokType {
 	KEY_LONG,
 	KEY_REGISTER,
 	KEY_RESTRICT,
+	KEY_RETURN,
 	KEY_SHORT,
 	KEY_SIGNED,
 	KEY_SIZEOF,
@@ -70,16 +71,15 @@ enum TokType {
 	OP_NE,
 
 	IDENTIFIER,
-	INT_LITERAL,
-	FLOAT_LITERAL,
+	CONSTANT,
+	STRING_LITERAL,
 
 	TOKTYPE_LEN
 };
 
 struct Token {
 	union TokVal {
-		int i;
-		std::uint64_t l;
+		long long i;
 		double f;
 		const char *s;
 	};
@@ -90,8 +90,10 @@ struct Token {
 
 	union TokVal val;
 
-	Token(TokType type, int line, int col, int char_count, union TokVal v = (TokVal){})
-		: type(type), line(line), col(col), char_count(char_count), val(v) {}
+	bool fp;
+
+	Token(TokType type, int line, int col, int char_count, union TokVal v = (TokVal){}, bool fp=false)
+		: type(type), line(line), col(col), char_count(char_count), val(v), fp(fp) {}
 };
 
 class Lexer
@@ -100,15 +102,14 @@ class Lexer
 	char *buf;
 	std::deque<Token> tok_buf;
 
-public:
 	Token next();
 	int count(int count);
 	bool keyword(const char *keyword);
 	void blockcomment();
 
+public:
 	void lex_err(const std::string &msg);
 
-// public:
 	Lexer(const std::string &filename);
 	~Lexer();
 
