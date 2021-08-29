@@ -1,90 +1,46 @@
 #include <lexer.hpp>
 
+#include <cstring>
+#include <sstream>
 #include <fstream>
+#include <cstring>
 #include <cctype>
 #include <string>
 #include <limits>
-#include <regex>
-
-#include <util/err.hpp>
 
 const int STR_TOK_LEN = IDENTIFIER - 256;
 
-const char *STR_TOKENS[STR_TOK_LEN] = {
-	"auto",
-	"_Bool",
-	"break",
-	"case",
-	"char",
-	"_Complex",
-	"const",
-	"continue",
-	"default",
-	"do",
-	"double",
-	"else",
-	"enum",
-	"extern",
-	"float",
-	"for",
-	"goto",
-	"if",
-	"_Imaginary",
-	"inline",
-	"int",
-	"long",
-	"register",
-	"restrict",
-	"return",
-	"short",
-	"signed",
-	"sizeof",
-	"static",
-	"struct",
-	"switch",
-	"typedef",
-	"union",
-	"unsigned",
-	"void",
-	"volatile",
-	"while",
-
-	"...",
-	">>=",
-	"<<=",
-	"+=",
-	"-=",
-	"*=",
-	"/=",
-	"%=",
-	"&=",
-	"^=",
-	"|=",
-	">>",
-	"<<",
-	"++",
-	"--",
-	"->",
-	"&&",
-	"||",
-	"<=",
-	">=",
-	"==",
-	"!=",
+const char *KEYWORDS[STR_TOK_LEN] = {
+#define DEF(type, str) str "\0",
+	TOKS
+#undef DEF
 };
 
-const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.?:";
-const std::regex STR_REGEX("(u8|[uUlL])?\"(\\.|[^\\\"\n])*\"");
+const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.";
+
+// TODO: add octal char, hex char, unicode code point
+char esc_code(char c)
+{
+	switch (c) {
+		case 'a': return '\x07';
+		case 'b': return '\x08';
+		case 'e': return '\x1b';
+		case 'f': return '\x0c';
+		case 'n': return '\x0a';
+		case 'r': return '\x0d';
+		case 't': return '\x09';
+		case 'v': return '\x0b';
+		default: return c;
+	}
+}
 
 Lexer::Lexer(const std::string &filename)
-	: index(0)
-	, line(1)
-	, col(1)
+	: index(0), line(1), col(1)
 {
 	std::ifstream file(filename, std::ifstream::binary);
 
 	if (!file)
-		err("Invalid file specified");
+		lex_err("Invalid file specified");
 
 	// get len
 	file.seekg(0, file.end);
@@ -96,8 +52,8 @@ Lexer::Lexer(const std::string &filename)
 	file.read(buf, len);
 
 	if (!file)
-		err("File could not be read!");
-	
+		lex_err("File could not be read!");
+
 	file.close();
 }
 
@@ -106,19 +62,21 @@ Lexer::~Lexer()
 	delete[] buf;
 }
 
-
 void Lexer::eat(TokType expected)
 {
-	Token next = Lexer::peek_next();
-	if (next.type != expected)
+	TokType next = peek_next().type;
+	std::cout << expected << '\n';
+	std::cout << next << '\n';
+	if (next != expected)
 	{
 		std::stringstream out;
+		
 		out << "Invalid token: expected "
-			/*<< REGEX[expected - 256]
+			<< getname(expected)
 			<< ", got "
-			<< REGEX[next.type - 256]*/;
+			<< getname(next);
 
-		err(out.str());
+		lex_err(out.str());
 	}
 
 	// remove cached value
@@ -132,7 +90,7 @@ Token Lexer::next()
 	{
 		char cur = buf[index];
 
-		// has to be at the start, otherwise buffer overflow from buf[index + 1]
+		// has to be first check, otherwise buffer overflow from buf[index + 1]
 		if (cur == '\0')
 			return Token(TOK_EOF, line, col, 0);
 
@@ -151,7 +109,10 @@ Token Lexer::next()
 			if (next == '/')
 			{
 				int len = 0;
-				while (buf[index + len] != '\n') { ++len; }
+				while (buf[index + len] != '\n')
+				{
+					++len;
+				}
 
 				count(len);
 				continue;
@@ -162,213 +123,142 @@ Token Lexer::next()
 				continue;
 			}
 		}
-		
+
 		// check for numeric constant
-		// c numeric constants are stupid complicated
 		if (std::isdigit(cur) || cur == '.')
 		{
-			bool fp = false;
-			int len = 0;
+			int end = index;
 			int base = 10;
+			bool fp = false;
 
-			// bin, hex, or octal
 			if (cur == '0')
 			{
-				char next = buf[index + 1];
+				cur = buf[++end];
 
 				// hex
-				if (next == 'x' || next == 'X')
+				if (cur == 'x' || cur == 'X')
 				{
-					len += 2;
-					// start past 0x
-					cur = buf[index + len];
-					char prev = cur;
+					do
+						cur = buf[++end];
+					while (std::isdigit(cur) || (cur >= 'a' && cur <= 'f') || (cur >= 'A' && cur <= 'F'));
 
-					if (cur == '\'')
-						lex_err("Digit separator cannot appear here");
-
-					while (std::isdigit(cur) || (cur >= 'a' && cur <= 'f') || (cur >= 'A' && cur <= 'F') || cur == '\'')
-					{
-						if (cur == '\'' && prev == '\'')
-							lex_err("Digit separator cannot appear here");
-
-						prev = cur;
-						cur = buf[index + (++len)];
-					}
-					
-					if (len < 3)
+					if (end - index < 3)
 						lex_err("Invalid hex constant");
-					
-					if (prev == '\'')
-						lex_err("Digit separator cannot appear here");
-
-					if (cur == '.')
+					else if (cur == '.')
 						lex_err("Invalid floating constant");
-					
+
 					base = 16;
 				}
-				// bin
-				else if (next == 'b' || next == 'B')
+				// binary
+				else if (cur == 'b' || cur == 'B')
 				{
-					len += 2;
-					// start past 0b
-					cur = buf[index + len];
-					char prev = cur;
-					while (cur == '0' || cur == '1' || cur == '\'')
-					{
-						if (cur == '\'' && prev == '\'')
-							lex_err("Digit separator cannot appear here");
-						prev = cur;
-						cur = buf[index + (++len)];
-					}
-					
-					if (len < 3)
+					do
+						cur = buf[++end];
+					while (cur == '0' || cur == '1');
+
+					if (end - index < 3)
 						lex_err("Invalid binary constant");
-
-					if (prev == '\'')
-						lex_err("Digit separator cannot appear here");
-
-					if (cur == '.')
+					else if (cur == '.')
 						lex_err("Invalid floating constant");
 
 					base = 2;
 				}
-				// octal/0
+				// octal
 				else
 				{
-					// start past 0
-					char prev = cur;
-					cur = buf[index + (++len)];
-					while ((std::isdigit(cur) && cur < '8') || cur == '.' || cur == '\'')
-					{
-						if (cur == '\'' && (prev == '\'' || prev == '.'))
-							lex_err("Digit separator cannot appear here");
+					do
+						cur = buf[++end];
+					while (cur >= '0' && cur < '8');
 
-						if (cur == '.')
-						{
-							if (prev == '\'')
-								lex_err("Digit separator cannot appear here");
+					if (cur == '8' || cur == '9')
+						lex_err("Invalid octal constant");
+					else if (cur == '.')
+						lex_err("Invalid float constant");
 
-							// TODO: improve err msg
-							if (fp)
-								lex_err("Invalid floating point constant: multiple \'.\'s ");
-							fp = true;
-						}
-
-						prev = cur;
-						cur = buf[index + (++len)];
-					}
-					
-					// if len == 1, then the number is 0, not octal
-					if (len > 1)
-					{
-						if (prev == '\'')
-							lex_err("Digit separator cannot appear here");
-
-						// for some reason octal numbers are dec when floating
-						if (!fp)
-						{
-							base = 8;
-
-							if (cur == '8' || cur == '9')
-								lex_err("Invalid octal constant");
-						}
-					}
+					// not a single zero
+					if (end - index > 1)
+						base = 8;
 				}
 			}
-			// base 10
+			// dec
 			else
 			{
-				char prev = cur;
-				while (std::isdigit(cur) || cur == '.')
+				do
 				{
-					if (cur == '\'' && (prev == '\'' || prev == '.'))
-						lex_err("Digit separator cannot appear here");
-
 					if (cur == '.')
 					{
-						if (prev == '\'')
-							lex_err("Digit separator cannot appear here");
-
-						// TODO: improve err msg
 						if (fp)
-							lex_err("Invalid floating point constant: multiple \'.\'s ");
+							lex_err("Invalid floating point constant: multiple \'.\'s");
 						fp = true;
 					}
+					cur = buf[++end];
+				} while (std::isdigit(cur) || cur == '.');
 
-					prev = cur;
-					cur = buf[index + (++len)];
-				}
-
-				if (prev == '\'')
-					lex_err("Digit separator cannot appear here");
-				
-				// if single '.'
-				if (len == 1 && prev == '.')
+				// cannot have single '.'
+				if (end - index == 1 && buf[index] == '.')
 					goto NUMCHECK_END;
 			}
 
 			bool fsuffix = false;
-			bool sign = true;
-			int longcount = 0;
+			bool usuffix = false;
+			int lcount = 0;
 
-			// numeric literal suffix
+			// suffixes
 			while (std::isalpha(cur))
 			{
 				if (cur == 'f')
 				{
-					// cant have two 'f's or unsigned float or integer constant with f
-					if (!fp || fsuffix || sign)
+					// cant have two 'f's or unsigned float
+					if (fsuffix || usuffix)
 						lex_err("Extra text after expected end of number");
-
 					fsuffix = true;
+					fp = true;
 				}
 				else if (cur == 'u')
 				{
 					// can't have two 'u's or unsigned float
-					if (sign || fp)
+					if (usuffix || fp)
 						lex_err("Extra text after expected end of number");
-					sign = true;
+					usuffix = true;
 				}
 				else if (cur == 'l')
 				{
 					// can't have separated 'l's
-					if (longcount)
+					if (lcount)
 						lex_err("Extra text after expected end of number");
 
 					// long long
-					if (buf[index + len + 1] == 'l')
+					if (buf[end + 1] == 'l')
 					{
-						longcount = 2;
-						++len;
+						lcount = 2;
+						++end;
 					}
 					else
-						longcount = 1;
+						lcount = 1;
 				}
-
-				cur = buf[index + (++len)];
+				
+				cur = buf[++end];
 			}
 
+			int len = end - index;
 			char *numbuf = new char[len + 1];
 			memcpy(numbuf, buf + index, len);
 			numbuf[len] = '\0';
 
-			Token out(CONSTANT, line, col, len, {}, fp);
+			Token out(INT_CONSTANT, line, col, len);
 
-			// TODO: add integer type sizes
-			// TODO: stoll doesn't work with digit separators :(
-			if (!fp)
-				out.val.i = std::stoll(numbuf, 0, base);
-			else
+			if (fp)
 			{
-				out.val.f = std::stod(numbuf);
+				out.type = FP_CONSTANT;
+				out.f = std::stod(numbuf);
 			}
-			
+			else
+				out.i = std::stoll(numbuf, 0, base);
+
 			delete[] numbuf;
 			count(len);
 			return out;
-		}
-		NUMCHECK_END:
+		} NUMCHECK_END:
 
 		// check single char constants
 		const char *ptr = CHAR_TOKENS;
@@ -383,13 +273,56 @@ Token Lexer::next()
 		// check all keywords
 		for (int i = 0; i < STR_TOK_LEN; ++i)
 		{
-			if (keyword(STR_TOKENS[i]))
+			if (keyword(KEYWORDS[i]))
 			{
-				int len = std::strlen(STR_TOKENS[i]);
-				Token out(static_cast<TokType>(i + 256), line, col, len);
+				int len = std::strlen(KEYWORDS[i]);
+				Token out(static_cast<TokType>(i + 255), line, col, len);
 				count(len);
 				return out;
 			}
+		}
+
+		// check for string constant
+		if (cur == '\"')
+		{
+			int esc_count = 0;
+			int end = index;
+			char prev = cur;
+
+			do {
+				prev = cur;
+				cur = buf[++end];
+
+				if (cur == '\\') ++esc_count;
+			// \"([^\"\\\n]|\\.)*\"
+			} while (cur && (prev == '\\' || cur != '\"') && cur != '\n');
+
+			// reached EOF
+			if (!cur)
+				lex_err("Unterminated string");
+			if (cur == '\n')
+				lex_err("Missing closing quote");
+			
+			int buf_len = end - index - esc_count;
+			int len = end - index + 1;
+			char *str_buf = new char[buf_len + 1];
+
+			int buf_idx = 0;
+			// start at index + 1 to skip first quote
+			for (int i = index + 1; i < end; ++i)
+			{
+				if (buf[i] == '\\')
+					str_buf[buf_idx++] = esc_code(buf[++i]);
+				else
+					str_buf[buf_idx++] = buf[i];
+			}
+
+			str_buf[buf_len] = '\0';
+
+			Token out(STR_CONSTANT, line, col, len);
+			out.s = str_buf;
+			count(len);
+			return out;
 		}
 
 		// try for a identifier
@@ -407,11 +340,12 @@ Token Lexer::next()
 
 			str[len] = '\0';
 
-			Token out(IDENTIFIER, line, col, len, { .s =  str });
+			Token out(IDENTIFIER, line, col, len);
+			out.s = str;
 			count(len);
 			return out;
 		}
-		
+
 		std::string s("Invalid character \'");
 		s += cur;
 		s += '\'';
@@ -510,9 +444,9 @@ void Lexer::blockcomment()
 void Lexer::lex_err(const std::string &msg)
 {
 	std::cerr << "Error: " << msg
-		<< " at line " << line
-		<< ", col " << col
-		<< '\n';
+			  << " at line " << line
+			  << ", col " << col
+			  << '\n';
 
 	exit(1);
 }
@@ -528,4 +462,19 @@ Token Lexer::peek(unsigned lookahead)
 	}
 
 	return tok_buf.at(lookahead - 1);
+}
+
+const char *Lexer::getname(TokType t) const
+{
+	if (t < 256)
+	{
+		char *c = new char[2];
+		c[0] = static_cast<char>(t);
+		c[1] = '\0';
+		return c;
+	}
+	else if (t < IDENTIFIER)
+		return KEYWORDS[t - 255];
+	else
+		return nullptr;
 }

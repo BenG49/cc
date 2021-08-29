@@ -1,37 +1,41 @@
 #include <iostream>
-#include <string>
 
-#include <util/err.hpp>
-#include <lexer.hpp>
+#include <parser.hpp>
 
-int main(int argc, const char *argv[])
-{
-	if (argc == 1)
-		err("No input file specified");
-	
-	Lexer l(argv[1]);
+int main(int argc, const char *argv[]) {
+    if (argc == 1)
+    {
+        return 1;
+    }
 
-	/*Token t = l.peek_next();
-	while(t.type)
-	{
-		t = l.peek_next();
-		if (t.type > 255)
-			std::cout << "TOK " << t.type;
-		else
-			std::cout << "TOK " << (char)t.type;
+    Lexer l(argv[1]);
+    Parser p(l);
+    Node *n = p.parse();
 
-		if (t.type == CONSTANT)
-		{
-			if (t.fp)
-				std::cout << " val " << t.val.f;
-			else
-				std::cout << " val " << t.val.i;
-		}
-		else if (t.type == IDENTIFIER || t.type == STRING_LITERAL)
-			std::cout << " val \"" << t.val.s << '\"';
+    /*Token t = l.peek_next();
+    while (t.type)
+    {
+        t = l.peek_next();
 
-		std::cout << '\n';
-		l.eat(t.type);
-	}*/
+        if (t.type < 256)
+            std::cout << "TOK " << (char)t.type;
+        else if (t.type < IDENTIFIER)
+        {
+            // std::cout << t.type << '\n';
+            std::cout << "TOK " << l.getname(t.type);
+        }
+        else
+            std::cout << "TOK " << t.type;
+
+        if (t.type == INT_CONSTANT)
+            std::cout << " val " << t.i;
+        else if (t.type == FP_CONSTANT)
+            std::cout << " val " << t.f;
+        else if (t.type == STR_CONSTANT || t.type == IDENTIFIER)
+            std::cout << " val " << t.s;
+
+        std::cout << '\n';
+
+        l.eat(t.type);
+    }*/
 }
-

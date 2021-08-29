@@ -2,63 +2,100 @@
 
 #include <vector>
 
+#include <symtab.hpp>
 #include <lexer.hpp>
 
-enum ASTType
+enum NodeType
 {
-    NODE,
-    LEAF,
+    DEFAULT,
     LIST,
+    TOKTYPE,
+    IF,
+    BIN_OP,
+    FUNC,
+    PARAMS,
+    VAR,
+    VARLIST,
+    TOKEN,
 };
 
-struct AST
+struct Node;
+
+struct DfltNode {
+    Node *lhs, *rhs;
+};
+
+struct ListNode {
+    std::vector<Node *> vec;
+};
+
+struct IfNode {
+    Node *cond;
+
+    std::vector<Node *> bodies;
+};
+
+struct BinOp {
+    char op;
+    Node *lhs, *rhs;
+};
+
+struct FuncNode {
+    Symbol *name;
+    Node *params, *body;
+};
+
+struct VarNode {
+    Symbol *s;
+};
+
+struct VarList {
+    std::vector<Symbol *> vec;
+};
+
+struct TokNode {
+    Token t;
+};
+
+// 
+
+struct Node
 {
-    ASTType id;
+    NodeType type;
 
-    AST(ASTType id)
-        : id(id) {}
+    union {
+        DfltNode node; 
+        ListNode listnode;
+        TokType t;
+        IfNode ifnode;
+        BinOp binnode;
+        FuncNode func;
+        VarNode var;
+        VarList vlist;
+        TokNode tok;
+    };
+
+    Node() {}
 };
-
-struct ASTNode : AST
-{
-    // TODO: add operator
-    AST *lhs, *rhs;
-
-    ASTNode(AST *lhs, AST *rhs)
-        : AST(NODE), lhs(lhs), rhs(rhs) {}
-};
-
-struct ASTLeaf : AST
-{
-    Token val;
-
-    ASTLeaf(Token val)
-        : AST(LEAF), val(val) {}
-};
-
-struct ASTList : AST
-{
-    std::vector<AST *> list;
-
-    ASTList(const std::vector<AST *> list)
-        : AST(LIST), list(list) {}
-};
-
-// functions
 
 class Parser
 {
     Lexer &l;
 
-    // 67 functions oh boy
-    AST primary_expr();
-    AST postfix_expr();
-    AST arg_expr_list();
+    Node *new_node(NodeType type);
 
-    void parse_err(const std::string &msg);
+    Node *expr();
+    Node *statement();
+    Node *returnstatement();
+    // Node *block();
+    // Node *ifstatement();
+    // Node *function();
+    // Node *decl();
+    // TokType type();
 
 public:
-    Parser(Lexer &l);
+    Parser(Lexer &l)
+        : l(l) {}
 
-    ASTList parse();
+    Node *parse();
 };

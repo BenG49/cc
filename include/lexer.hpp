@@ -1,99 +1,78 @@
 #pragma once
 
 #include <iostream>
-#include <cstdint>
 #include <string>
 #include <deque>
 
-enum TokType {
+#define TOKS                      \
+	DEF(KEY_BOOL, "bool")         \
+	DEF(KEY_CONST, "const")       \
+	DEF(KEY_CHAR, "char")         \
+	DEF(KEY_ELSE, "else")         \
+	DEF(KEY_ENUM, "enum")         \
+	DEF(KEY_FLOAT, "float")       \
+	DEF(KEY_FOR, "for")           \
+	DEF(KEY_IF, "if")             \
+	DEF(KEY_INT, "int")           \
+	DEF(KEY_RETURN, "return")     \
+	DEF(KEY_SIZEOF, "sizeof")     \
+	DEF(KEY_STRUCT, "struct")     \
+	DEF(KEY_UNSIGNED, "unsigned") \
+	DEF(KEY_VOID, "void")         \
+	DEF(KEY_WHILE, "while")       \
+	DEF(OP_SHR_SET, ">>=")        \
+	DEF(OP_SHL_SET, "<<=")        \
+	DEF(OP_ADD_SET, "+=")         \
+	DEF(OP_SUB_SET, "-=")         \
+	DEF(OP_MUL_SET, "*=")         \
+	DEF(OP_DIV_SET, "/=")         \
+	DEF(OP_MOD_SET, "%=")         \
+	DEF(OP_AND_SET, "&=")         \
+	DEF(OP_XOR_SET, "^=")         \
+	DEF(OP_OR_SET, "|=")          \
+	DEF(OP_SHR, ">>")             \
+	DEF(OP_SHL, "<<")             \
+	DEF(OP_INC, "++")             \
+	DEF(OP_DEC, "--")             \
+	DEF(OP_PTR, "->")             \
+	DEF(OP_AND, "&&")             \
+	DEF(OP_LE, "<=")              \
+	DEF(OP_GE, ">=")              \
+	DEF(OP_EQ, "==")              \
+	DEF(OP_NE, "!=")
+
+enum TokType
+{
 	TOK_EOF,
-	// ascii values
+	LAST_ASCII = 255,
+#define DEF(type, str) type,
+	TOKS
+#undef DEF
 
-	KEY_AUTO = 256,
-	KEY_BOOL,
-	KEY_BREAK,
-	KEY_CASE,
-	KEY_CHAR,
-	KEY_COMPLEX,
-	KEY_CONST,
-	KEY_CONTINUE,
-	KEY_DEFAULT,
-	KEY_DO,
-	KEY_DOUBLE,
-	KEY_ELSE,
-	KEY_ENUM,
-	KEY_EXTERN,
-	KEY_FLOAT,
-	KEY_FOR,
-	KEY_GOTO,
-	KEY_IF,
-	KEY_IMAGINARY,
-	KEY_INLINE,
-	KEY_INT,
-	KEY_LONG,
-	KEY_REGISTER,
-	KEY_RESTRICT,
-	KEY_RETURN,
-	KEY_SHORT,
-	KEY_SIGNED,
-	KEY_SIZEOF,
-	KEY_STATIC,
-	KEY_STRUCT,
-	KEY_SWITCH,
-	KEY_TYPEDEF,
-	KEY_UNION,
-	KEY_UNSIGNED,
-	KEY_VOID,
-	KEY_VOLATILE,
-	KEY_WHILE,
-
-	OP_ELLIPSIS,
-	OP_SHR_SET,
-	OP_SHL_SET,
-	OP_ADD_SET,
-	OP_SUB_SET,
-	OP_MUL_SET,
-	OP_DIV_SET,
-	OP_MOD_SET,
-	OP_AND_SET,
-	OP_XOR_SET,
-	OP_OR_SET,
-	OP_SHR,
-	OP_SHL,
-	OP_INC,
-	OP_DEC,
-	OP_PTR,
-	OP_AND,
-	OP_OR,
-	OP_LE,
-	OP_GE,
-	OP_EQ,
-	OP_NE,
-
-	IDENTIFIER,
-	CONSTANT,
-	STRING_LITERAL,
-
-	TOKTYPE_LEN
+		IDENTIFIER,
+	INT_CONSTANT,
+	FP_CONSTANT,
+	STR_CONSTANT,
+	TOK_COUNT,
 };
 
-struct Token {
-	union TokVal {
+struct Token
+{
+	TokType type;
+
+	int line, col, char_count;
+
+	union
+	{
 		long long i;
 		double f;
 		const char *s;
 	};
 
-	TokType type;
-
-	int line, col, char_count;
-
-	union TokVal val;
-
 	bool fp;
 
-	Token(TokType type, int line, int col, int char_count, union TokVal v = (TokVal){}, bool fp=false)
-		: type(type), line(line), col(col), char_count(char_count), val(v), fp(fp) {}
+	Token(TokType type, int line, int col, int char_count, bool fp = false)
+		: type(type), line(line), col(col), char_count(char_count), fp(fp) {}
 };
 
 class Lexer
@@ -102,6 +81,7 @@ class Lexer
 	char *buf;
 	std::deque<Token> tok_buf;
 
+public:
 	Token next();
 	int count(int count);
 	bool keyword(const char *keyword);
@@ -118,5 +98,5 @@ public:
 	// lookahead must be > 0
 	Token peek(unsigned lookahead);
 
-	bool has_next() const;
+	const char *getname(TokType t) const;
 };
