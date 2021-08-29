@@ -62,17 +62,49 @@ struct Token
 
 	int line, col, char_count;
 
-	union
-	{
+	union {
 		long long i;
 		double f;
-		const char *s;
+		std::string s;
 	};
 
 	bool fp;
 
 	Token(TokType type, int line, int col, int char_count, bool fp = false)
 		: type(type), line(line), col(col), char_count(char_count), fp(fp) {}
+	
+	Token(const Token &t)
+		: type(t.type)
+	{
+		switch(t.type) {
+			case INT_CONSTANT: i = t.i; break;
+			case FP_CONSTANT:  f = t.f; break;
+			case STR_CONSTANT: s = t.s; break;
+			case IDENTIFIER:   s = t.s; break;
+			default: break;
+		}
+	}
+	
+	~Token() {
+		// for some reason this causes a double free/free of invalid memory, lol imagine worrying about mem leaks
+		// if (type == STR_CONSTANT || type == IDENTIFIER)
+		// 	s.~basic_string();
+	};
+
+	Token &operator=(const Token &t)
+	{
+		type = t.type;
+
+		switch(type) {
+			case INT_CONSTANT: i = t.i; break;
+			case FP_CONSTANT:  f = t.f; break;
+			case STR_CONSTANT: s = t.s; break;
+			case IDENTIFIER:   s = t.s; break;
+			default: break;
+		}
+
+		return *this;
+	}
 };
 
 class Lexer

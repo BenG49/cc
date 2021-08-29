@@ -27,6 +27,7 @@ struct DfltNode {
 
 struct ListNode {
     std::vector<Node *> vec;
+    ListNode() {}
 };
 
 struct IfNode {
@@ -51,6 +52,7 @@ struct VarNode {
 
 struct VarList {
     std::vector<Symbol *> vec;
+    VarList() {}
 };
 
 struct TokNode {
@@ -76,6 +78,15 @@ struct Node
     };
 
     Node() {}
+    Node(NodeType t)
+        : type(t)
+    {
+        switch (t) {
+            case LIST: new(&listnode) ListNode(); break;
+            case VARLIST: new(&vlist) VarList(); break;
+            default: break;
+        }
+    }
 };
 
 class Parser

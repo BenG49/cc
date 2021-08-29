@@ -5,12 +5,14 @@
 int main(int argc, const char *argv[]) {
     if (argc == 1)
     {
+        std::cout << "Must specify input file!\n";
         return 1;
     }
 
     Lexer l(argv[1]);
     Parser p(l);
     Node *n = p.parse();
+    n++; // just to get rid of unused var warning
 
     /*Token t = l.peek_next();
     while (t.type)

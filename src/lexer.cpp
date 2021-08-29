@@ -65,8 +65,6 @@ Lexer::~Lexer()
 void Lexer::eat(TokType expected)
 {
 	TokType next = peek_next().type;
-	std::cout << expected << '\n';
-	std::cout << next << '\n';
 	if (next != expected)
 	{
 		std::stringstream out;
@@ -166,9 +164,8 @@ Token Lexer::next()
 				// octal
 				else
 				{
-					do
+					while (cur >= '0' && cur < '8')
 						cur = buf[++end];
-					while (cur >= '0' && cur < '8');
 
 					if (cur == '8' || cur == '9')
 						lex_err("Invalid octal constant");
@@ -241,9 +238,7 @@ Token Lexer::next()
 			}
 
 			int len = end - index;
-			char *numbuf = new char[len + 1];
-			memcpy(numbuf, buf + index, len);
-			numbuf[len] = '\0';
+			std::string numbuf(buf + index, len);
 
 			Token out(INT_CONSTANT, line, col, len);
 
@@ -255,7 +250,6 @@ Token Lexer::next()
 			else
 				out.i = std::stoll(numbuf, 0, base);
 
-			delete[] numbuf;
 			count(len);
 			return out;
 		} NUMCHECK_END:
@@ -276,7 +270,7 @@ Token Lexer::next()
 			if (keyword(KEYWORDS[i]))
 			{
 				int len = std::strlen(KEYWORDS[i]);
-				Token out(static_cast<TokType>(i + 255), line, col, len);
+				Token out(static_cast<TokType>(i + 256), line, col, len);
 				count(len);
 				return out;
 			}
@@ -305,7 +299,8 @@ Token Lexer::next()
 			
 			int buf_len = end - index - esc_count;
 			int len = end - index + 1;
-			char *str_buf = new char[buf_len + 1];
+			std::string str_buf;
+			str_buf.reserve(buf_len);
 
 			int buf_idx = 0;
 			// start at index + 1 to skip first quote
@@ -334,14 +329,9 @@ Token Lexer::next()
 			while (std::isalnum(buf[end]) || buf[end] == '_');
 
 			int len = end - index;
-			char *str = new char[len + 1];
-
-			std::memcpy(str, buf + index, len);
-
-			str[len] = '\0';
 
 			Token out(IDENTIFIER, line, col, len);
-			out.s = str;
+			out.s = std::string(buf + index, len);
 			count(len);
 			return out;
 		}

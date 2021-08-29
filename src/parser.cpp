@@ -3,9 +3,7 @@
 // TODO: add some sort of actual memory management
 Node *Parser::new_node(NodeType type)
 {
-    Node *out = new Node;
-    out->type = type;
-    return out;
+    return new Node(type);
 }
 
 Node *Parser::expr()
@@ -23,7 +21,7 @@ Node *Parser::expr()
 
 Node *Parser::statement()
 {
-    Node *out;
+    Node *out = nullptr;
 
     switch (l.peek_next().type) {
         case KEY_RETURN: out = returnstatement(); break;
@@ -143,16 +141,17 @@ Node *Parser::parse()
     Node *out = new_node(LIST);
 
     l.eat(KEY_INT);
-    std::cout << "aeoigneiangieungieun\n";
     l.eat(IDENTIFIER);
     l.eat(static_cast<TokType>('('));
     l.eat(static_cast<TokType>(')'));
     l.eat(static_cast<TokType>('{'));
 
-    std::cout << l.peek_next().type << '\n';
-
-    while (l.peek_next().type && l.peek_next().type != '}')
+    TokType next = l.peek_next().type;
+    while (next && next != '}')
+    {
         out->listnode.vec.push_back(statement());
+        next = l.peek_next().type;
+    }
 
     l.eat(static_cast<TokType>('}'));
     
