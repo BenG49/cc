@@ -27,7 +27,7 @@ struct DfltNode {
 
 struct ListNode {
     std::vector<Node *> vec;
-    ListNode() {}
+    ListNode() = default;
 };
 
 struct IfNode {
@@ -52,7 +52,7 @@ struct VarNode {
 
 struct VarList {
     std::vector<Symbol *> vec;
-    VarList() {}
+    VarList() = default;
 };
 
 struct TokNode {

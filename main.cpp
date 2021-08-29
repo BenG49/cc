@@ -12,7 +12,6 @@ int main(int argc, const char *argv[]) {
     Lexer l(argv[1]);
     Parser p(l);
     Node *n = p.parse();
-    n++; // just to get rid of unused var warning
 
     /*Token t = l.peek_next();
     while (t.type)
