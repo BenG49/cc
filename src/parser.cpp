@@ -1,27 +1,21 @@
 #include <parser.hpp>
 
-// TODO: add some sort of actual memory management
-Node *Parser::new_node(NodeType type)
+Expr *Parser::expr()
 {
-    return new Node(type);
-}
-
-Node *Parser::expr()
-{
-    Node *out = new_node(TOKEN);
-
     if (l.peek_next().type != INT_CONSTANT)
         l.lex_err("Invalid token");
-    
-    out->tok.t = l.peek_next();
+
+    Expr *out = new Leaf(l.peek_next());
+    out->type = LEAF;
+
     l.eat(INT_CONSTANT);
 
     return out;
 }
 
-Node *Parser::statement()
+Stmt *Parser::statement()
 {
-    Node *out = nullptr;
+    Stmt *out = nullptr;
 
     switch (l.peek_next().type) {
         case KEY_RETURN: out = returnstatement(); break;
@@ -34,13 +28,14 @@ Node *Parser::statement()
     return out;
 }
 
-Node *Parser::returnstatement()
+Ret *Parser::returnstatement()
 {
-    Node *out = new_node(DEFAULT);
-
     l.eat(KEY_RETURN);
 
-    out->node.lhs = expr();
+    Ret *out = new Ret;
+
+    out->type = RET;
+    out->r = expr();
 
     return out;
 }
@@ -101,7 +96,6 @@ Node *Parser::ifstatement()
     return out;
 }
 
-// TODO: add symtable
 // function = type IDENTIFIER '(' params ' )' '{' statementlist '}'
 Node *Parser::function()
 {
@@ -136,20 +130,21 @@ TokType Parser::type()
 //
 
 // statementlist = statement statementlist | statement EOF
-Node *Parser::parse()
+Block *Parser::parse()
 {
-    Node *out = new_node(LIST);
-
     l.eat(KEY_INT);
     l.eat(IDENTIFIER);
     l.eat(static_cast<TokType>('('));
     l.eat(static_cast<TokType>(')'));
     l.eat(static_cast<TokType>('{'));
 
+    Block *out = new Block;
+    out->type = BLOCK;
+
     TokType next = l.peek_next().type;
     while (next && next != '}')
     {
-        out->listnode.vec.push_back(statement());
+        out->vec.push_back(statement());
         next = l.peek_next().type;
     }
 

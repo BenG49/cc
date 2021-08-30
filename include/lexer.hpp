@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <variant>
 #include <string>
 #include <deque>
 
@@ -62,12 +63,7 @@ struct Token
 
 	int line, col, char_count;
 
-	// TODO: make variant
-	union {
-		long long i;
-		double f;
-		std::string s;
-	};
+	std::variant<long long, double, std::string> val;
 
 	bool fp;
 
@@ -76,39 +72,7 @@ struct Token
 	
 	Token(const Token &t)
 		: type(t.type)
-	{
-		switch(type) {
-			case INT_CONSTANT: i = t.i; break;
-			case FP_CONSTANT:  f = t.f; break;
-			case IDENTIFIER:
-			case STR_CONSTANT: new(&s) std::string(t.s); break;
-			default: break;
-		}
-	}
-	
-	~Token() {
-		// for some reason this causes a double free/free of invalid memory, lol imagine worrying about mem leaks
-		if (type == STR_CONSTANT || type == IDENTIFIER)
-			s.~basic_string();
-	};
-
-	Token &operator=(const Token &t)
-	{
-		if (&t != this)
-		{
-			type = t.type;
-
-			switch(type) {
-				case INT_CONSTANT: i = t.i; break;
-				case FP_CONSTANT:  f = t.f; break;
-				case IDENTIFIER:
-				case STR_CONSTANT: s = t.s; break;
-				default: break;
-			}
-		}
-
-		return *this;
-	}
+		, val(t.val) { }
 };
 
 class Lexer

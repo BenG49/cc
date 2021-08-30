@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include <parser.hpp>
+#include <codegen.hpp>
 
 int main(int argc, const char *argv[]) {
     if (argc == 1)
@@ -11,7 +11,7 @@ int main(int argc, const char *argv[]) {
 
     Lexer l(argv[1]);
     Parser p(l);
-    Node *n = p.parse();
+    x86_codegen("out.S", p.parse());
 
     /*Token t = l.peek_next();
     while (t.type)

@@ -238,17 +238,23 @@ Token Lexer::next()
 			}
 
 			int len = end - index;
-			std::string numbuf(buf + index, len);
+
+			std::string numbuf;
+			// for some reason stoll doesnt like 0b but works with 0x
+			if (base == 2)
+				numbuf = std::string(buf + index + 2, len - 2);
+			else
+				numbuf = std::string(buf + index, len);
 
 			Token out(INT_CONSTANT, line, col, len);
 
 			if (fp)
 			{
 				out.type = FP_CONSTANT;
-				out.f = std::stod(numbuf);
+				out.val = std::stod(numbuf);
 			}
 			else
-				out.i = std::stoll(numbuf, 0, base);
+				out.val = std::stoll(numbuf, 0, base);
 
 			count(len);
 			return out;
@@ -312,10 +318,8 @@ Token Lexer::next()
 					str_buf[buf_idx++] = buf[i];
 			}
 
-			str_buf[buf_len] = '\0';
-
 			Token out(STR_CONSTANT, line, col, len);
-			out.s = str_buf;
+			out.val = str_buf;
 			count(len);
 			return out;
 		}
@@ -331,7 +335,7 @@ Token Lexer::next()
 			int len = end - index;
 
 			Token out(IDENTIFIER, line, col, len);
-			out.s = std::string(buf + index, len);
+			out.val = std::string(buf + index, len);
 			count(len);
 			return out;
 		}

@@ -7,100 +7,92 @@
 
 enum NodeType
 {
-    DEFAULT,
-    LIST,
-    TOKTYPE,
+    BLOCK,
     IF,
-    BIN_OP,
-    FUNC,
-    PARAMS,
-    VAR,
-    VARLIST,
-    TOKEN,
+    FOR,
+    WHILE,
+    DECL,
+    ASSIGN,
+    RET,
+    BINOP,
+    UNOP,
+    COND,
+    LEAF,
 };
 
-struct Node;
+struct Node {
+    NodeType type;
+};
+struct Stmt : Node {};
+struct Expr : Node {};
 
-struct DfltNode {
-    Node *lhs, *rhs;
+struct Block : Stmt {
+    std::vector<Stmt *> vec;
 };
 
-struct ListNode {
-    std::vector<Node *> vec;
-    ListNode() = default;
+struct If : Stmt {
+    Expr *cond;
+    Stmt *if_blk, *else_blk;
 };
 
-struct IfNode {
-    Node *cond;
-
-    std::vector<Node *> bodies;
+struct For : Stmt {
+    Stmt *init, *inc, *blk;
+    Expr *cond;
 };
 
-struct BinOp {
-    char op;
-    Node *lhs, *rhs;
+struct While : Stmt {
+    Stmt *blk;
+    Expr *cond;
 };
 
-struct FuncNode {
-    Symbol *name;
-    Node *params, *body;
+struct Decl : Stmt {
+    TokType type;
+    Symbol *sym;
+    Expr *expr;
 };
 
-struct VarNode {
-    Symbol *s;
+struct Assign : Stmt {
+    TokType op;
+    Expr *lval, rval;
 };
 
-struct VarList {
-    std::vector<Symbol *> vec;
-    VarList() = default;
+struct Ret : Stmt {
+    Expr *r;
 };
 
-struct TokNode {
+//
+
+struct BinOp : Expr {
+    TokType op;
+    Expr *lhs, *rhs;
+};
+
+struct UnOp : Expr {
+    TokType op;
+    Expr *operand;
+};
+
+struct Cond : Expr {
+    Expr *cond, t, f;
+};
+
+struct Leaf : Expr {
     Token t;
+    Leaf(const Token &t) : t(t) {}
 };
 
 // 
-
-struct Node
-{
-    NodeType type;
-
-    union {
-        DfltNode node; 
-        ListNode listnode;
-        TokType t;
-        IfNode ifnode;
-        BinOp binnode;
-        FuncNode func;
-        VarNode var;
-        VarList vlist;
-        TokNode tok;
-    };
-
-    Node() {}
-    Node(NodeType t)
-        : type(t)
-    {
-        switch (t) {
-            case LIST: new(&listnode) ListNode(); break;
-            case VARLIST: new(&vlist) VarList(); break;
-            default: break;
-        }
-    }
-};
 
 class Parser
 {
     Lexer &l;
 
-    Node *new_node(NodeType type);
-
-    Node *expr();
-    Node *statement();
-    Node *returnstatement();
+    Expr *expr();
+    Stmt *statement();
+    Ret *returnstatement();
+    // Node *function();
     // Node *block();
     // Node *ifstatement();
-    // Node *function();
     // Node *decl();
     // TokType type();
 
@@ -108,5 +100,5 @@ public:
     Parser(Lexer &l)
         : l(l) {}
 
-    Node *parse();
+    Block *parse();
 };
