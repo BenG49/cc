@@ -82,11 +82,11 @@ struct Ret : Stmt {
 
 //
 
-/*struct BinOp : Expr {
+struct BinOp : Expr {
     TokType op;
     Expr *lhs, *rhs;
     BinOp() { type = BINOP; }
-};*/
+};
 
 struct UnOp : Expr {
     TokType op;
@@ -118,6 +118,8 @@ class Parser
     Func *function();
     Block *block();
     UnOp *unop();
+    BinOp *binop();
+
     // Node *ifstatement();
     // Node *decl();
     // TokType type();
