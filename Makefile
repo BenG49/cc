@@ -31,6 +31,7 @@ test: $(TARGET)
 clean:
 	$(RM) $(TARGET)
 	$(RM) $(OBJS)
+	$(RM) $(ASM_TARGET)
 
 debug: $(TARGET)
 	gdb --args $< tests/a.c

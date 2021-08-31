@@ -3,7 +3,6 @@
 #include <fstream>
 #include <vector>
 
-#include <symtab.hpp>
 #include <lexer.hpp>
 
 enum NodeType
@@ -28,6 +27,14 @@ struct Node {
 };
 struct Stmt : Node {};
 struct Expr : Node {};
+
+struct Symbol : Expr {
+    TokType type;
+    std::string name;
+
+    Symbol(TokType t, const std::string &name)
+        : type(t), name(name) {}
+};
 
 struct Block : Stmt {
     std::vector<Stmt *> vec;
@@ -114,11 +121,17 @@ class Parser
 
     Expr *expr();
     Stmt *statement();
-    Ret *returnstatement();
-    Func *function();
-    Block *block();
-    UnOp *unop();
-    BinOp *binop();
+    Stmt *returnstatement();
+    Stmt *function();
+    Stmt *block();
+    Expr *unop();
+    Expr *binop();
+
+		Expr *equality();
+		Expr *comparison();
+		Expr *term();
+		Expr *factor();
+		Expr *primary();
 
     // Node *ifstatement();
     // Node *decl();

@@ -56,7 +56,7 @@ bool Parser::is_type(TokType t)
     return t == KEY_BOOL || t == KEY_CHAR || t == KEY_INT || t == KEY_FLOAT || t == KEY_VOID;
 }
 
-// const | unop
+// binop | const
 Expr *Parser::expr()
 {
     Expr *out = nullptr;
@@ -94,7 +94,7 @@ Stmt *Parser::statement()
 }
 
 // 'return' expr
-Ret *Parser::returnstatement()
+Stmt *Parser::returnstatement()
 {
     l.eat(KEY_RETURN);
 
@@ -106,7 +106,7 @@ Ret *Parser::returnstatement()
 }
 
 // type IDENTIFIER '(' (type IDENTIFIER,)* ')' '{' blk '}'
-Func *Parser::function()
+Stmt *Parser::function()
 {
     Func *out = new Func;
 
@@ -149,7 +149,7 @@ Func *Parser::function()
 }
 
 // stmt | '{' stmt* '}'
-Block *Parser::block()
+Stmt *Parser::block()
 {
     Block *out = new Block;
 
@@ -167,22 +167,152 @@ Block *Parser::block()
     return out;
 }
 
-// ('!' | '~' | '-') expr
-UnOp *Parser::unop()
+// ('!' | '~' | '-') unary | primary
+Expr *Parser::unop()
 {
     UnOp *out = new UnOp;
 
     TokType t = l.peek_next().type;
     if (t != '!' && t != '~' && t != '-')
-        l.lex_err("Expected unary operator");
+			return primary();
     
     l.eat(t);
 
     out->op = t;
-    out->operand = expr();
+    out->operand = unary();
 
     return out;
 }
+
+// equality
+Expr *Parser::binop()
+{
+	return equality();
+}
+
+// comparison ((OP_EQ|OP_NEQ) equality)*
+Expr *Parser::equality()
+{
+	BinOp *out = comparison();
+
+	TokType t = l.peek_next().type;
+
+	while (t == OP_EQ || t == OP_NEQ)
+	{
+		l.eat(t);
+
+		BinOp *tmp = new BinOp;
+
+		tmp->rhs = equality();
+		tmp->lhs = out;
+
+		out = tmp;
+
+		t = l.peek_next().type;
+	}
+
+	return out;
+}
+
+// term ((OP_LE|OP_GE|'<'|'>') comparison)*
+Expr *Parser::comparison()
+{
+	BinOp *out = term();
+
+	TokType t = l.peek_next().type;
+
+	while (t == OP_LE || t == OP_GE | t == '<' || t == '>')
+	{
+		l.eat(t);
+
+		BinOp *tmp = new BinOp;
+
+		tmp->rhs = comparison();
+		tmp->lhs = out;
+
+		out = tmp;
+
+		t = l.peek_next().type;
+	}
+
+	return out;
+}
+
+// factor (('+'|'-') term)*
+Expr *Parser::term()
+{
+	BinOp *out = factor();
+
+	TokType t = l.peek_next().type;
+
+	while (t == '+' || t == '-')
+	{
+		l.eat(t);
+
+		BinOp *tmp = new BinOp;
+
+		tmp->rhs = term();
+		tmp->lhs = out;
+
+		out = tmp;
+
+		t = l.peek_next().type;
+	}
+
+	return out;
+}
+
+// unop (('/'|'*') factor)*
+Expr *Parser::factor()
+{
+	BinOp *out = unop();
+
+	TokType t = l.peek_next().type;
+
+	while (t == '/' || t == '*')
+	{
+		l.eat(t);
+
+		BinOp *tmp = new BinOp;
+
+		tmp->rhs = factor();
+		tmp->lhs = out;
+
+		out = tmp;
+
+		t = l.peek_next().type;
+	}
+
+	return out;
+}
+
+// INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
+Expr *Parser::primary()
+{
+	Token tok = l.peek_next();
+	TokType t = tok.type;
+
+	if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT)
+	{
+		l.eat(t);
+		Const *out = new Const;
+		out->t = tok;
+		return out;
+	}
+	else if (t == IDENTIFIER)
+		return new Symbol(t, std::get<std::string>(tok.val));
+	else if (t == '(')
+	{
+		l.eat(static_cast<TokType>('('));
+		Expr *out = expr();
+		l.eat(static_cast<TokType>(')'));
+
+		return out;
+	}
+	else
+		lex_err(std::string("Invalid expression ") + l.getname(t));
+}
+
 
 // ifstatement = IF '(' expr ')' statement
 //             | IF '(' expr ')' '{' statementblock '}'
@@ -241,7 +371,7 @@ TokType Parser::type()
 //
 
 // statementlist = statement statementlist | statement EOF
-Block *Parser::parse()
+Expr *Parser::parse()
 {
     Block *out = new Block;
 
