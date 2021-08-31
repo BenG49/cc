@@ -62,17 +62,17 @@ Lexer::~Lexer()
 	delete[] buf;
 }
 
-void Lexer::eat(TokType expected)
+Token Lexer::eat(TokType expected)
 {
-	TokType next = peek_next().type;
-	if (next != expected)
+	Token next = peek_next();
+	if (next.type != expected)
 	{
 		std::stringstream out;
 		
 		out << "Invalid token: expected "
 			<< getname(expected)
 			<< ", got "
-			<< getname(next);
+			<< getname(next.type);
 
 		lex_err(out.str());
 	}
@@ -80,6 +80,8 @@ void Lexer::eat(TokType expected)
 	// remove cached value
 	if (tok_buf.size() > 0)
 		tok_buf.pop_front();
+	
+	return next;
 }
 
 Token Lexer::next()
@@ -468,7 +470,7 @@ const char *Lexer::getname(TokType t) const
 		return c;
 	}
 	else if (t < IDENTIFIER)
-		return KEYWORDS[t - 255];
+		return KEYWORDS[t - 256];
 	else
 		return nullptr;
 }

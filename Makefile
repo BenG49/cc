@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Iinclude -std=c++17 -g
+CFLAGS=-Wall -Wno-switch -Iinclude -std=c++17 -g
 
 SRCS=$(shell find ./src/ -type f -name '*.cpp')
 HDRS=$(shell find ./include/ -type f -name '*.hpp')
@@ -8,9 +8,11 @@ OBJS=${SRCS:.cpp=.o}
 ARGS=
 TARGET=a.out
 
-ASM_TARGET=out.S
-OBJ_TARGET=${ASM_TARGET:.S=.o}
+ASM_TARGET=out.s
+OBJ_TARGET=${ASM_TARGET:.s=.o}
 BIN_TARGET=prog.out
+
+TEST_SCRIPT=test.sh
 
 .PHONY: run clean debug valgrind
 
@@ -20,10 +22,11 @@ $(TARGET): $(OBJS) $(HDRS) main.cpp
 %.o: %.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-run: $(TARGET)
+test: $(TARGET)
 	./$< $(ARGS)
 	gcc $(ASM_TARGET) -o $(BIN_TARGET)
-	rm $(ASM_TARGET)
+
+	./test.sh $(BIN_TARGET) $(ARGS)
 
 clean:
 	$(RM) $(TARGET)

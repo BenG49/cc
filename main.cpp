@@ -11,7 +11,7 @@ int main(int argc, const char *argv[]) {
 
     Lexer l(argv[1]);
     Parser p(l);
-    x86_codegen("out.S", p.parse());
+    x86_codegen("out.s", p.parse());
 
     /*Token t = l.peek_next();
     while (t.type)

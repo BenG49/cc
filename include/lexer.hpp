@@ -93,7 +93,7 @@ public:
 	Lexer(const std::string &filename);
 	~Lexer();
 
-	void eat(TokType expected);
+	Token eat(TokType expected);
 	Token peek_next();
 	// lookahead must be > 0
 	Token peek(unsigned lookahead);

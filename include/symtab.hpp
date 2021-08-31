@@ -6,7 +6,10 @@
 
 struct Symbol {
     TokType type;
-    const char *name;
+    std::string name;
+
+    Symbol(TokType t, const std::string &name)
+        : type(t), name(name) {}
 };
 
 struct SymTab
