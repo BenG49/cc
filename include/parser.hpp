@@ -3,145 +3,167 @@
 #include <fstream>
 #include <vector>
 
+#include <codegen.hpp>
+#include <symtab.hpp>
 #include <lexer.hpp>
 
 enum NodeType
 {
-    BLOCK,
-    IF,
-    FOR,
-    WHILE,
-    DECL,
-    ASSIGN,
-    FUNC,
-    RET,
-    BINOP,
-    UNOP,
-    COND,
-    CONST,
+	BLOCK,
+	IF,
+	FOR,
+	WHILE,
+	DECL,
+	ASSIGN,
+	FUNC,
+	RET,
+	BINOP,
+	UNOP,
+	COND,
+	CONST,
+	VAR,
 };
 
 struct Node {
-    NodeType type;
-    virtual void emit(std::ofstream &out) const {}
+	NodeType type;
+	virtual void emit(Gen &g) const {}
 };
 struct Stmt : Node {};
 struct Expr : Node {};
 
-struct Symbol : Expr {
-    TokType type;
-    std::string name;
-
-    Symbol(TokType t, const std::string &name)
-        : type(t), name(name) {}
+struct Var : Expr {
+	int entry;
+	Var() { type = VAR; }
+	Var(int entry) : entry(entry) { type = VAR; }
+	void emit(Gen &g) const override;
 };
 
 struct Block : Stmt {
-    std::vector<Stmt *> vec;
-    Block() { type = BLOCK; }
-    void emit(std::ofstream &out) const override;
+	std::vector<Node *> vec;
+	Block() { type = BLOCK; }
+	void emit(Gen &g) const override;
 };
 
 /*struct If : Stmt {
-    Expr *cond;
-    Stmt *if_blk, *else_blk;
-    If() { type = IF; }
+	Expr *cond;
+	Stmt *if_blk, *else_blk;
+	If() { type = IF; }
 };
 
 struct For : Stmt {
-    Stmt *init, *inc, *blk;
-    Expr *cond;
-    For() { type = FOR; }
+	Stmt *init, *inc, *blk;
+	Expr *cond;
+	For() { type = FOR; }
 };
 
 struct While : Stmt {
-    Stmt *blk;
-    Expr *cond;
-    While() { type = WHILE; }
+	Stmt *blk;
+	Expr *cond;
+	While() { type = WHILE; }
 };
-
-struct Decl : Stmt {
-    TokType type;
-    Symbol sym;
-    Expr *expr;
-    Decl() { type = DECL; }
-};
-
-struct Assign : Stmt {
-    TokType op;
-    Expr *lval, rval;
-    Assign() { type = ASSIGN; }
-};*/
+*/
 
 struct Func : Stmt {
-    // [0] = function symbol
-    std::vector<Symbol> name_params;
-    Stmt *blk;
-    Func() { type = FUNC; }
-    void emit(std::ofstream &out) const override;
+	Var name;
+	std::vector<Symbol> params;
+	Stmt *blk;
+	int offset;
+	Func() : offset(0) { type = FUNC; }
+	void emit(Gen &g) const override;
 };
 
 struct Ret : Stmt {
-    Expr *r;
-    Ret() { type = RET; }
-    void emit(std::ofstream &out) const override;
+	Expr *r;
+	Ret() { type = RET; }
+	void emit(Gen &g) const override;
+};
+
+struct Decl : Stmt {
+	Var v;
+	Expr *expr;
+	Decl(Var v) : v(v) { type = DECL; }
+	Decl(Var v, Expr *expr)
+		: v(v)
+		, expr(expr) { type = DECL; }
+	void emit(Gen &g) const override;
 };
 
 //
 
 struct BinOp : Expr {
-    TokType op;
-    Expr *lhs, *rhs;
-    BinOp() { type = BINOP; }
+	TokType op;
+	Expr *lhs, *rhs;
+	BinOp() { type = BINOP; }
+	BinOp(TokType op, Expr *lhs, Expr *rhs)
+		: op(op)
+		, lhs(lhs)
+		, rhs(rhs) { type = BINOP; }
+	void emit(Gen &g) const override;
 };
 
 struct UnOp : Expr {
-    TokType op;
-    Expr *operand;
-    UnOp() { type = UNOP; }
-    void emit(std::ofstream &out) const override;
+	TokType op;
+	Expr *operand;
+	UnOp() { type = UNOP; }
+	UnOp(TokType op, Expr *operand)
+		: op(op)
+		, operand(operand) { type = UNOP; }
+	void emit(Gen &g) const override;
 };
 
-/*struct Cond : Expr {
-    Expr *cond, t, f;
-    Cond() { type = COND; }
-};*/
+struct Assign : Expr {
+	TokType op;
+	Expr *lval, *rval;
+	Assign() { type = ASSIGN; }
+	Assign(TokType op, Expr *lval, Expr *rval)
+		: op(op)
+		, lval(lval)
+		, rval(rval) { type = ASSIGN; }
+	void emit(Gen &g) const override;
+};
 
 struct Const : Expr {
-    Token t;
-    Const(const Token &t) : t(t) { type = CONST; }
-    void emit(std::ofstream &out) const override;
+	Token t;
+	Const(const Token &t) : t(t) { type = CONST; }
+	void emit(Gen &g) const override;
 };
 
 // 
 
 class Parser
 {
-    Lexer &l;
+	Lexer &l;
+	SymTab &s;
 
-    Expr *expr();
-    Stmt *statement();
-    Stmt *returnstatement();
-    Stmt *function();
-    Stmt *block();
-    Expr *unop();
-    Expr *binop();
+	Func *cur_func;
 
-		Expr *equality();
-		Expr *comparison();
-		Expr *term();
-		Expr *factor();
-		Expr *primary();
+	Expr *expr();
+	Node *statement();
 
-    // Node *ifstatement();
-    // Node *decl();
-    // TokType type();
+	Stmt *returnstatement();
+	Stmt *function();
+	Stmt *block();
+	Stmt *decl();
 
-    bool is_type(TokType t);
+	Expr *assign();
+
+	Expr *binop();
+	Expr *op_or();
+	Expr *op_and();
+	Expr *bitwise_or();
+	Expr *bitwise_xor();
+	Expr *bitwise_and();
+	Expr *equality();
+	Expr *comparison();
+	Expr *shift();
+	Expr *term();
+	Expr *factor();
+	Expr *unop();
+	Expr *primary();
 
 public:
-    Parser(Lexer &l)
-        : l(l) {}
+	Parser(Lexer &l, SymTab &s)
+		: l(l), s(s) {}
 
-    Block *parse();
+	Block *parse();
 };

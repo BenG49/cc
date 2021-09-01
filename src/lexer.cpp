@@ -16,9 +16,15 @@ const char *KEYWORDS[STR_TOK_LEN] = {
 #undef DEF
 };
 
+const char *NAMES[TOK_COUNT - IDENTIFIER] = {
+	"identifier",
+	"integer constant",
+	"floating constant",
+	"string constant",
+};
+
 const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.";
 
-// TODO: add octal char, hex char, unicode code point
 char esc_code(char c)
 {
 	switch (c) {
@@ -48,8 +54,9 @@ Lexer::Lexer(const std::string &filename)
 	file.seekg(0, file.beg);
 
 	// alloc and set buf
-	buf = new char[len];
+	buf = new char[len + 1];
 	file.read(buf, len);
+	buf[len] = '\0';
 
 	if (!file)
 		lex_err("File could not be read!");
@@ -262,16 +269,6 @@ Token Lexer::next()
 			return out;
 		} NUMCHECK_END:
 
-		// check single char constants
-		const char *ptr = CHAR_TOKENS;
-		while (*ptr)
-			if (cur == *ptr++)
-			{
-				Token out(static_cast<TokType>(cur), line, col, 1);
-				count(1);
-				return out;
-			}
-
 		// check all keywords
 		for (int i = 0; i < STR_TOK_LEN; ++i)
 		{
@@ -283,6 +280,16 @@ Token Lexer::next()
 				return out;
 			}
 		}
+
+		// check single char constants
+		const char *ptr = CHAR_TOKENS;
+		while (*ptr)
+			if (cur == *ptr++)
+			{
+				Token out(static_cast<TokType>(cur), line, col, 1);
+				count(1);
+				return out;
+			}
 
 		// check for string constant
 		if (cur == '\"')
@@ -460,7 +467,7 @@ Token Lexer::peek(unsigned lookahead)
 	return tok_buf.at(lookahead - 1);
 }
 
-const char *Lexer::getname(TokType t) const
+const char *Lexer::getname(TokType t)
 {
 	if (t < 256)
 	{
@@ -472,5 +479,5 @@ const char *Lexer::getname(TokType t) const
 	else if (t < IDENTIFIER)
 		return KEYWORDS[t - 256];
 	else
-		return nullptr;
+		return NAMES[t - IDENTIFIER];
 }

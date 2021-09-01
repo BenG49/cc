@@ -37,6 +37,7 @@
 	DEF(OP_DEC, "--")             \
 	DEF(OP_PTR, "->")             \
 	DEF(OP_AND, "&&")             \
+	DEF(OP_OR, "||")             \
 	DEF(OP_LE, "<=")              \
 	DEF(OP_GE, ">=")              \
 	DEF(OP_EQ, "==")              \
@@ -50,7 +51,7 @@ enum TokType
 	TOKS
 #undef DEF
 
-		IDENTIFIER,
+	IDENTIFIER,
 	INT_CONSTANT,
 	FP_CONSTANT,
 	STR_CONSTANT,
@@ -98,5 +99,5 @@ public:
 	// lookahead must be > 0
 	Token peek(unsigned lookahead);
 
-	const char *getname(TokType t) const;
+	static const char *getname(TokType t);
 };

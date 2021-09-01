@@ -1,4 +1,4 @@
 int main()
 {
-    return !-~0b10010;
+    return 1;
 }

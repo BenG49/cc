@@ -24,7 +24,7 @@ $(TARGET): $(OBJS) $(HDRS) main.cpp
 
 test: $(TARGET)
 	./$< $(ARGS)
-	gcc $(ASM_TARGET) -o $(BIN_TARGET)
+	gcc $(ASM_TARGET) -g -o $(BIN_TARGET)
 
 	./test.sh $(BIN_TARGET) $(ARGS)
 
@@ -32,6 +32,7 @@ clean:
 	$(RM) $(TARGET)
 	$(RM) $(OBJS)
 	$(RM) $(ASM_TARGET)
+	$(RM) $(BIN_TARGET)
 
 debug: $(TARGET)
 	gdb --args $< tests/a.c
