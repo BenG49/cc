@@ -1,6 +1,7 @@
 # cc
 
 TODO:
+- actually be able to program in this language
 - add octal char, hex char, unicode code point escape codes in lexer
 - add size attribute to symbol
 - add power of two optimization for mul, div, mod
