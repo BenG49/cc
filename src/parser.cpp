@@ -180,195 +180,51 @@ Expr *Parser::assign()
 
 // -------- binary operations -------- //
 
-// op_and { '&&' op_and }
-Expr *Parser::op_or()
-{
-	Expr *out = op_and();
-
-	TokType t = l.peek_next().type;
-
-	while (t == OP_AND)
-	{
-		l.eat(OP_AND);
-
-		out = new BinOp(OP_AND, out, op_and());
-
-		t = l.peek_next().type;
+#define BINEXP(func, call_func, type_eval)  \
+	Expr *Parser::func()						  \
+	{											  \
+		Expr *out = call_func();				  \
+		TokType t = l.peek_next().type;			  \
+												  \
+		while (type_eval)						  \
+		{										  \
+			l.eat(t);							  \
+			out = new BinOp(t, out, call_func()); \
+			t = l.peek_next().type;				  \
+		}										  \
+												  \
+		return out;								  \
 	}
 
-	return out;
-}
+// op_and { '||' op_and }
+BINEXP(op_or, op_and, t == OP_OR)
 
-// bitwise_or { '||' bitwise_or }
-Expr *Parser::op_and()
-{
-	Expr *out = bitwise_or();
-
-	TokType t = l.peek_next().type;
-
-	while (t == OP_OR)
-	{
-		l.eat(OP_OR);
-
-		out = new BinOp(OP_OR, out, bitwise_or());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+// bitwise_or { '&&' bitwise_or }
+BINEXP(op_and, bitwise_or, t == OP_AND)
 
 // bitwise_xor { '|' bitwise_xor }
-Expr *Parser::bitwise_or()
-{
-	Expr *out = bitwise_xor();
-
-	TokType t = l.peek_next().type;
-
-	while (t == '|')
-	{
-		l.eat(static_cast<TokType>('|'));
-
-		out = new BinOp(static_cast<TokType>('|'), out, bitwise_xor());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(bitwise_or, bitwise_xor, t == '|')
 
 // bitwise_and { '^' bitwise_and }
-Expr *Parser::bitwise_xor()
-{
-	Expr *out = bitwise_and();
-
-	TokType t = l.peek_next().type;
-
-	while (t == '^')
-	{
-		l.eat(static_cast<TokType>('^'));
-
-		out = new BinOp(static_cast<TokType>('^'), out, bitwise_and());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(bitwise_xor, bitwise_and, t == '^')
 
 // equality { '&' equality }
-Expr *Parser::bitwise_and()
-{
-	Expr *out = equality();
-
-	TokType t = l.peek_next().type;
-
-	while (t == '&')
-	{
-		l.eat(static_cast<TokType>('&'));
-
-		out = new BinOp(static_cast<TokType>('&'), out, equality());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(bitwise_and, equality, t == '&')
 
 // comparison { ( OP_EQ | OP_NE ) comparison }
-Expr *Parser::equality()
-{
-	Expr *out = comparison();
-
-	TokType t = l.peek_next().type;
-
-	while (t == OP_EQ || t == OP_NE)
-	{
-		l.eat(t);
-
-		out = new BinOp(t, out, comparison());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(equality, comparison, t == OP_EQ || t == OP_NE)
 
 // shift { ( OP_LE | OP_GE | '<' | '>' ) shift }
-Expr *Parser::comparison()
-{
-	Expr *out = shift();
-
-	TokType t = l.peek_next().type;
-
-	while (t == OP_LE || t == OP_GE || t == '<' || t == '>')
-	{
-		l.eat(t);
-
-		out = new BinOp(t, out, shift());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(comparison, shift, t == OP_LE || t == OP_GE || t == '<' || t == '>')
 
 // term { ( OP_SHR | OP_SHL ) term }
-Expr *Parser::shift()
-{
-	Expr *out = term();
-
-	TokType t = l.peek_next().type;
-
-	while (t == OP_SHL || t == OP_SHR)
-	{
-		l.eat(t);
-
-		out = new BinOp(t, out, term());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(shift, term, t == OP_SHL || t == OP_SHR)
 
 // factor { ( '+' | '-' ) factor }
-Expr *Parser::term()
-{
-	Expr *out = factor();
-
-	TokType t = l.peek_next().type;
-
-	while (t == '+' || t == '-')
-	{
-		l.eat(t);
-
-		out = new BinOp(t, out, factor());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(term, factor, t == '+' || t == '-')
 
 // unop { ( '/' | '*' | '%' ) unop }
-Expr *Parser::factor()
-{
-	Expr *out = unop();
-
-	TokType t = l.peek_next().type;
-
-	while (t == '/' || t == '*' || t == '%')
-	{
-		l.eat(t);
-
-		out = new BinOp(t, out, unop());
-
-		t = l.peek_next().type;
-	}
-
-	return out;
-}
+BINEXP(factor, unop, t == '/' || t == '*' || t == '%')
 
 // postfix | ( OP_INC | OP_DEC ) lval | ( '!' | '~' | '-' ) unop
 Expr *Parser::unop()

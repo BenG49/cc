@@ -71,7 +71,7 @@ void prettyprint(const Node *ast, int tabs, const SymTab &s)
             printf("CONST: ");
             switch (((Const*)ast)->t.type) {
                 case INT_CONSTANT: printf("%lld", std::get<long long>(((Const*)ast)->t.val)); break;
-                case FP_CONSTANT: printf("%f", std::get<double>(((Const*)ast)->t.val)); break;
+                case FP_CONSTANT:  printf("%f", std::get<double>(((Const*)ast)->t.val)); break;
                 case STR_CONSTANT: printf("%s", std::get<std::string>(((Const*)ast)->t.val).c_str()); break;
                 default: printf("cringe");
             }
