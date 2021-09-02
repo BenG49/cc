@@ -1,4 +1,6 @@
 int main()
 {
-    return 2 == ((1 ^ 2) & 2);
+    int i = 10;
+    int j = 2 + i++;
+    return j;
 }

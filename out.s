@@ -2,22 +2,21 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
+	sub $8, %rsp
 	
-	mov $2, %eax
+	mov $10, %eax
+	mov %eax, -4(%rbp)
+	movl -4(%rbp), %eax
 	push %rax
-	mov $2, %eax
-	push %rax
-	mov $1, %eax
-	pop %rcx
-	xor %ecx, %eax
-	pop %rcx
-	and %ecx, %eax
+	inc %eax
+	mov %eax, -4(%rbp)
+	pop %rax
 	push %rax
 	mov $2, %eax
 	pop %rcx
-	cmp %eax, %ecx
-	mov $0, %eax
-	sete %al
+	add %ecx, %eax
+	mov %eax, -8(%rbp)
+	movl -8(%rbp), %eax
 
 	mov %rbp, %rsp
 	pop %rbp

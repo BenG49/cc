@@ -22,37 +22,26 @@ Expr *Parser::expr()
 	if (is_assign(l.peek(2).type))
 	 	return assign();
 	else
-		return binop();
+		return op_or();
 }
 
-// func | ret | expr
+// ret | expr | decl
 Node *Parser::statement()
 {
 	Node *out = nullptr;
-	bool semi = true;
 
 	switch (l.peek_next().type) {
 		case KEY_RETURN: out = returnstatement(); break;
-		case IDENTIFIER: case INT_CONSTANT: case FP_CONSTANT: case STR_CONSTANT: case '!': case '~': case '-': case '(':
-			out = expr(); break;
 		case KEY_VOID: case KEY_BOOL: case KEY_CHAR: case KEY_INT: case KEY_FLOAT:
-		{
-			TokType t = l.peek(3).type;
-			if (t == '=' || t == ';')
-				out = decl();
-			else
-			{
-				out = function();
-				semi = false;
-			}
-			break;
-		}
+			out = decl(); break;
 		default:
-			l.lex_err(std::string("Invalid token ") + l.getname(l.peek_next().type));
+			out = expr(); break;
+
+		// case IDENTIFIER: case INT_CONSTANT: case FP_CONSTANT: case STR_CONSTANT: case '!': case '~': case '-': case '(':
+			// l.lex_err(std::string("Invalid token ") + l.getname(l.peek_next().type));
 	}
 
-	if (semi)
-		l.eat(static_cast<TokType>(';'));
+	l.eat(static_cast<TokType>(';'));
 
 	return out;
 }
@@ -69,7 +58,7 @@ Stmt *Parser::returnstatement()
 	return out;
 }
 
-// type IDENTIFIER '(' (type IDENTIFIER,)* ')' '{' blk '}'
+// type IDENTIFIER '(' {type IDENTIFIER,} ')' '{' blk '}'
 Stmt *Parser::function()
 {
 	Func *out = new Func;
@@ -169,10 +158,16 @@ Stmt *Parser::decl()
 
 // -------- expressions -------- //
 
-// IDENTIFIER assign expr
+// IDENTIFIER
+Expr *Parser::lval()
+{
+	return new Var(s.lookup(std::get<std::string>(l.eat(IDENTIFIER).val)));
+}
+
+// lval [ assign expr ]
 Expr *Parser::assign()
 {
-	Var *v = new Var(s.lookup(std::get<std::string>(l.eat(IDENTIFIER).val)));
+	Expr *lv = lval();
 
 	TokType t = l.peek_next().type;
 	if (!is_assign(t))
@@ -180,22 +175,12 @@ Expr *Parser::assign()
 	
 	l.eat(t);
 
-	return new Assign(t, v, expr());
+	return new Assign(t, lv, expr());
 }
 
-/*
+// -------- binary operations -------- //
 
-binary operations
-
-*/
-
-// op_or
-Expr *Parser::binop()
-{
-	return op_or();
-}
-
-// op_and ('&&' op_and)*
+// op_and { '&&' op_and }
 Expr *Parser::op_or()
 {
 	Expr *out = op_and();
@@ -206,8 +191,7 @@ Expr *Parser::op_or()
 	{
 		l.eat(OP_AND);
 
-		BinOp *tmp = new BinOp(OP_AND, out, op_and());
-		out = tmp;
+		out = new BinOp(OP_AND, out, op_and());
 
 		t = l.peek_next().type;
 	}
@@ -215,7 +199,7 @@ Expr *Parser::op_or()
 	return out;
 }
 
-// bitwise_or ('||' bitwise_or)*
+// bitwise_or { '||' bitwise_or }
 Expr *Parser::op_and()
 {
 	Expr *out = bitwise_or();
@@ -226,8 +210,7 @@ Expr *Parser::op_and()
 	{
 		l.eat(OP_OR);
 
-		BinOp *tmp = new BinOp(OP_OR, out, bitwise_or());
-		out = tmp;
+		out = new BinOp(OP_OR, out, bitwise_or());
 
 		t = l.peek_next().type;
 	}
@@ -235,7 +218,7 @@ Expr *Parser::op_and()
 	return out;
 }
 
-// bitwise_xor ('|' bitwise_xor)*
+// bitwise_xor { '|' bitwise_xor }
 Expr *Parser::bitwise_or()
 {
 	Expr *out = bitwise_xor();
@@ -246,8 +229,7 @@ Expr *Parser::bitwise_or()
 	{
 		l.eat(static_cast<TokType>('|'));
 
-		BinOp *tmp = new BinOp(static_cast<TokType>('|'), out, bitwise_xor());
-		out = tmp;
+		out = new BinOp(static_cast<TokType>('|'), out, bitwise_xor());
 
 		t = l.peek_next().type;
 	}
@@ -255,7 +237,7 @@ Expr *Parser::bitwise_or()
 	return out;
 }
 
-// bitwise_and ('^' bitwise_and)*
+// bitwise_and { '^' bitwise_and }
 Expr *Parser::bitwise_xor()
 {
 	Expr *out = bitwise_and();
@@ -266,8 +248,7 @@ Expr *Parser::bitwise_xor()
 	{
 		l.eat(static_cast<TokType>('^'));
 
-		BinOp *tmp = new BinOp(static_cast<TokType>('^'), out, bitwise_and());
-		out = tmp;
+		out = new BinOp(static_cast<TokType>('^'), out, bitwise_and());
 
 		t = l.peek_next().type;
 	}
@@ -275,7 +256,7 @@ Expr *Parser::bitwise_xor()
 	return out;
 }
 
-// equality ('&' equality)*
+// equality { '&' equality }
 Expr *Parser::bitwise_and()
 {
 	Expr *out = equality();
@@ -286,8 +267,7 @@ Expr *Parser::bitwise_and()
 	{
 		l.eat(static_cast<TokType>('&'));
 
-		BinOp *tmp = new BinOp(static_cast<TokType>('&'), out, equality());
-		out = tmp;
+		out = new BinOp(static_cast<TokType>('&'), out, equality());
 
 		t = l.peek_next().type;
 	}
@@ -295,7 +275,7 @@ Expr *Parser::bitwise_and()
 	return out;
 }
 
-// comparison ((OP_EQ|OP_NE) comparison)*
+// comparison { ( OP_EQ | OP_NE ) comparison }
 Expr *Parser::equality()
 {
 	Expr *out = comparison();
@@ -306,8 +286,7 @@ Expr *Parser::equality()
 	{
 		l.eat(t);
 
-		BinOp *tmp = new BinOp(t, out, comparison());
-		out = tmp;
+		out = new BinOp(t, out, comparison());
 
 		t = l.peek_next().type;
 	}
@@ -315,7 +294,7 @@ Expr *Parser::equality()
 	return out;
 }
 
-// shift ((OP_LE|OP_GE|'<'|'>') shift)*
+// shift { ( OP_LE | OP_GE | '<' | '>' ) shift }
 Expr *Parser::comparison()
 {
 	Expr *out = shift();
@@ -326,8 +305,7 @@ Expr *Parser::comparison()
 	{
 		l.eat(t);
 
-		BinOp *tmp = new BinOp(t, out, shift());
-		out = tmp;
+		out = new BinOp(t, out, shift());
 
 		t = l.peek_next().type;
 	}
@@ -335,7 +313,7 @@ Expr *Parser::comparison()
 	return out;
 }
 
-// term ((OP_SHR|OP_SHL) term)*
+// term { ( OP_SHR | OP_SHL ) term }
 Expr *Parser::shift()
 {
 	Expr *out = term();
@@ -346,8 +324,7 @@ Expr *Parser::shift()
 	{
 		l.eat(t);
 
-		BinOp *tmp = new BinOp(t, out, term());
-		out = tmp;
+		out = new BinOp(t, out, term());
 
 		t = l.peek_next().type;
 	}
@@ -355,7 +332,7 @@ Expr *Parser::shift()
 	return out;
 }
 
-// factor (('+'|'-') factor)*
+// factor { ( '+' | '-' ) factor }
 Expr *Parser::term()
 {
 	Expr *out = factor();
@@ -366,8 +343,7 @@ Expr *Parser::term()
 	{
 		l.eat(t);
 
-		BinOp *tmp = new BinOp(t, out, factor());
-		out = tmp;
+		out = new BinOp(t, out, factor());
 
 		t = l.peek_next().type;
 	}
@@ -375,7 +351,7 @@ Expr *Parser::term()
 	return out;
 }
 
-// unop (('/'|'*'|'%') unop)*
+// unop { ( '/' | '*' | '%' ) unop }
 Expr *Parser::factor()
 {
 	Expr *out = unop();
@@ -386,8 +362,7 @@ Expr *Parser::factor()
 	{
 		l.eat(t);
 
-		BinOp *tmp = new BinOp(t, out, unop());
-		out = tmp;
+		out = new BinOp(t, out, unop());
 
 		t = l.peek_next().type;
 	}
@@ -395,18 +370,40 @@ Expr *Parser::factor()
 	return out;
 }
 
-// ('!' | '~' | '-') unop | primary
+// postfix | ( OP_INC | OP_DEC ) lval | ( '!' | '~' | '-' ) unop
 Expr *Parser::unop()
 {
 	TokType t = l.peek_next().type;
-	if (t != '!' && t != '~' && t != '-')
-			return primary();
-	
-	l.eat(t);
+	if (t == OP_INC || t == OP_DEC)
+	{
+		l.eat(t);
 
-	UnOp *out = new UnOp(t, unop());
+		return new UnOp(t, lval());
+	}
+	else if (t == '!' || t == '~' || t == '-')
+	{
+		l.eat(t);
 
-	return out;
+		return new UnOp(t, unop());
+	}
+	else
+		return postfix();
+}
+
+// primary [ OP_INC | OP_DEC ]
+Expr *Parser::postfix()
+{
+	Expr *p = primary();
+
+	TokType t = l.peek_next().type;
+	std::cout << "postfix: " << Lexer::getname(t) << '\n';
+	if (t == OP_INC || t == OP_DEC)
+	{
+		l.eat(t);
+		return new Post(t, p);
+	}
+	else
+		return p;
 }
 
 // INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
@@ -435,19 +432,15 @@ Expr *Parser::primary()
 	return nullptr;
 }
 
-/*
+// -------- main program blk -------- //
 
-main program block
-
-*/
-
-// statementlist = statement statementlist | statement EOF
+// statementlist = function statementlist | function EOF
 Block *Parser::parse()
 {
 	Block *out = new Block;
 
 	while (l.peek_next().type)
-		out->vec.push_back(statement());
+		out->vec.push_back(function());
 	
 	return out;
 }

@@ -200,25 +200,50 @@ void BinOp::emit(Gen &g) const
 
 void UnOp::emit(Gen &g) const
 {
-	switch (op) {
-		case '-':
-			operand->emit(g);
-			g.emit("neg %eax");
-			break;
+	operand->emit(g);
 
-		case '~':
-			operand->emit(g);
-			g.emit("not %eax");
-			break;
+	switch (op) {
+		case '-': g.emit("neg %eax"); break;
+		case '~': g.emit("not %eax"); break;
+		case OP_INC: g.emit("inc %eax"); break;
+		case OP_DEC: g.emit("dec %eax"); break;
 
 		case '!':
-			operand->emit(g);
 			g.emit("test, %eax, %eax"); // test if operand is 0
 			g.emit("mov $0, %eax"); // cannot use xor because it will reset flags
 			g.emit("setz %al"); // if operand was zero, set to one
 			break;
+
 		default: break;
 	}
+}
+
+void Post::emit(Gen &g) const
+{
+	operand->emit(g);
+
+	g.emit("push %rax");
+
+	// apply op
+	switch (op) {
+		case OP_INC:
+			g.emit("inc %eax");
+			break;
+		
+		case OP_DEC:
+			g.emit("dec %eax");
+			break;
+
+		default: break;
+	}
+
+	// update variable
+	g.emit("mov %eax, -", false);
+	g.emit_int(g.s.vec[((Var*)operand)->entry].ebp_offset);
+	g.emit_append("(%rbp)", true);
+
+	// reset register
+	g.emit("pop %rax");
 }
 
 void Assign::emit(Gen &g) const

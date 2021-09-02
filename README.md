@@ -8,6 +8,8 @@ TODO:
 - support lvalues not just being identifiers
 - add comma operator (have to make it lower precedence than =)
     - honestly almost never used
+- make it so single semicolons are valid
+- make it so things other than identifiers can be lvalues
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 

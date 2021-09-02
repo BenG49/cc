@@ -19,6 +19,7 @@ enum NodeType
 	RET,
 	BINOP,
 	UNOP,
+	POSTFIX,
 	COND,
 	CONST,
 	VAR,
@@ -111,6 +112,16 @@ struct UnOp : Expr {
 	void emit(Gen &g) const override;
 };
 
+struct Post : Expr {
+	TokType op;
+	Expr *operand;
+	Post() { type = POSTFIX; }
+	Post(TokType op, Expr *operand)
+		: op(op)
+		, operand(operand) { type = UNOP; }
+	void emit(Gen &g) const override;
+};
+
 struct Assign : Expr {
 	TokType op;
 	Expr *lval, *rval;
@@ -145,9 +156,9 @@ class Parser
 	Stmt *block();
 	Stmt *decl();
 
+	Expr *lval();
 	Expr *assign();
 
-	Expr *binop();
 	Expr *op_or();
 	Expr *op_and();
 	Expr *bitwise_or();
@@ -159,6 +170,7 @@ class Parser
 	Expr *term();
 	Expr *factor();
 	Expr *unop();
+	Expr *postfix();
 	Expr *primary();
 
 public:
