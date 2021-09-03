@@ -129,7 +129,7 @@ int main(int argc, const char *argv[]) {
     Parser p(l, s);
     Block *b = p.parse();
 
-    prettyprint(b, 0, s);
+    // prettyprint(b, 0, s);
 
     Gen g("out.s", s);
     g.x86_codegen(b);

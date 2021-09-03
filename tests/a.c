@@ -1,5 +1,8 @@
 int main()
 {
-    int i = 3;
-    return (i != 3) ? 1 : 2;
+    // simple test to see if the universe still functions
+    if (1 == 1)
+        return 0;
+    else
+        return 1;
 }

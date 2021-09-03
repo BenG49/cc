@@ -1,5 +1,7 @@
 # cc
 
+The least optimized compiler you'll ever see.
+
 TODO:
 - actually be able to program in this language
 - add octal char, hex char, unicode code point escape codes in lexer
@@ -9,7 +11,7 @@ TODO:
 - add comma operator (have to make it lower precedence than =)
     - honestly almost never used
 - make it so single semicolons are valid
-- make it so things other than identifiers can be lvalues
+- add good error messages
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 

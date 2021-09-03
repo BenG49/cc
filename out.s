@@ -2,30 +2,29 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	sub $4, %rsp
 	
-	mov $3, %eax
-	mov %eax, -4(%rbp)
-	mov $3, %eax
+	mov $1, %eax
 	push %rax
-	movl -4(%rbp), %eax
+	mov $1, %eax
 	pop %rcx
-	cmp %eax, %ecx
+	cmp %ecx, %eax
 	mov $0, %eax
-	setne %al
+	sete %al
 	test %eax, %eax
 	jz uwu0
-# true block
-	mov $1, %eax
-	jmp uwu2
-uwu0:
-# false blk
-	mov $2, %eax
-uwu2:
+	mov $0, %eax
 
 	mov %rbp, %rsp
 	pop %rbp
 	ret
+	jmp uwu1
+uwu0:
+	mov $1, %eax
+
+	mov %rbp, %rsp
+	pop %rbp
+	ret
+uwu1:
 	
 	xor %eax, %eax
 

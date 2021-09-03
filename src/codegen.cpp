@@ -47,7 +47,6 @@ void If::emit(Gen &g) const
 	g.emit("test %eax, %eax");
 	g.emit("jz ", false); g.emit_append(lbl_else, true);
 	// if_blk
-	g.comment("if blk");
 	if_blk->emit(g);
 
 	// (if else_blk then jmp past else)
@@ -63,7 +62,6 @@ void If::emit(Gen &g) const
 	// (if else_blk then emit else_blk, emit else_end:)
 	if (else_blk)
 	{
-		g.comment("else blk");
 		else_blk->emit(g);
 		g.emit_append(else_end); g.emit_append(":", true);
 		delete[] else_end;
@@ -130,7 +128,6 @@ void BinOp::emit(Gen &g) const
 	// short circuit and, or
 	if (op == OP_OR)
 	{
-		g.comment("short circuit or");
 		const char *eval_rhs = g.get_label();
 		const char *end = g.get_label();
 
@@ -160,7 +157,6 @@ void BinOp::emit(Gen &g) const
 	}
 	else if (op == OP_AND)
 	{
-		g.comment("short circuit and");
 		const char *eval_rhs = g.get_label();
 		const char *end = g.get_label();
 
@@ -343,7 +339,6 @@ void Cond::emit(Gen &g) const
 	g.emit("test %eax, %eax");
 	g.emit("jz ", false); g.emit_append(lbl_else, true);
 	// t
-	g.comment("true block");
 	t->emit(g);
 
 	else_end = g.get_label();
@@ -352,7 +347,6 @@ void Cond::emit(Gen &g) const
 	// false:
 	g.emit_append(lbl_else); g.emit_append(":", true);
 	
-	g.comment("false blk");
 	f->emit(g);
 	g.emit_append(else_end); g.emit_append(":", true);
 
