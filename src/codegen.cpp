@@ -35,6 +35,43 @@ void Block::emit(Gen &g) const
 		s->emit(g);
 }
 
+void If::emit(Gen &g) const
+{
+	const char *lbl_else = g.get_label();
+	const char *else_end = nullptr;
+
+	// cond
+	cond->emit(g);
+
+	// jz end/else
+	g.emit("test %eax, %eax");
+	g.emit("jz ", false); g.emit_append(lbl_else, true);
+	// if_blk
+	g.comment("if blk");
+	if_blk->emit(g);
+
+	// (if else_blk then jmp past else)
+	if (else_blk)
+	{
+		else_end = g.get_label();
+		g.emit("jmp ", false); g.emit_append(else_end, true);
+	}
+
+	// else:
+	g.emit_append(lbl_else); g.emit_append(":", true);
+	
+	// (if else_blk then emit else_blk, emit else_end:)
+	if (else_blk)
+	{
+		g.comment("else blk");
+		else_blk->emit(g);
+		g.emit_append(else_end); g.emit_append(":", true);
+		delete[] else_end;
+	}
+
+	delete[] lbl_else;
+}
+
 void Func::emit(Gen &g) const
 {
 	g.emit_append(".globl ");
@@ -292,6 +329,35 @@ void Assign::emit(Gen &g) const
 	g.emit_int(g.s.vec[((Var*)lval)->entry].ebp_offset);
 	g.emit_append("(%rbp)", true);
 	return;
+}
+
+void Cond::emit(Gen &g) const
+{
+	const char *lbl_else = g.get_label();
+	const char *else_end = g.get_label();
+
+	// cond
+	cond->emit(g);
+
+	// jz false
+	g.emit("test %eax, %eax");
+	g.emit("jz ", false); g.emit_append(lbl_else, true);
+	// t
+	g.comment("true block");
+	t->emit(g);
+
+	else_end = g.get_label();
+	g.emit("jmp ", false); g.emit_append(else_end, true);
+
+	// false:
+	g.emit_append(lbl_else); g.emit_append(":", true);
+	
+	g.comment("false blk");
+	f->emit(g);
+	g.emit_append(else_end); g.emit_append(":", true);
+
+	delete[] else_end;
+	delete[] lbl_else;
 }
 
 void Const::emit(Gen &g) const

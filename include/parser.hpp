@@ -45,13 +45,21 @@ struct Block : Stmt {
 	void emit(Gen &g) const override;
 };
 
-/*struct If : Stmt {
+struct If : Stmt {
 	Expr *cond;
-	Stmt *if_blk, *else_blk;
+	Node *if_blk, *else_blk;
 	If() { type = IF; }
+	If(Expr *cond, Node *if_blk)
+		: cond(cond)
+		, if_blk(if_blk) { type = IF; }
+	If(Expr *cond, Node *if_blk, Node *else_blk)
+		: cond(cond)
+		, if_blk(if_blk)
+		, else_blk(else_blk) { type = IF; }
+	void emit(Gen &g) const override;
 };
 
-struct For : Stmt {
+/*struct For : Stmt {
 	Stmt *init, *inc, *blk;
 	Expr *cond;
 	For() { type = FOR; }
@@ -89,7 +97,7 @@ struct Decl : Stmt {
 	void emit(Gen &g) const override;
 };
 
-//
+// -------- ast expressions -------- //
 
 struct BinOp : Expr {
 	TokType op;
@@ -133,13 +141,23 @@ struct Assign : Expr {
 	void emit(Gen &g) const override;
 };
 
+struct Cond : Expr {
+	Expr *cond, *t, *f;
+	Cond() { type = COND; }
+	Cond(Expr *cond, Expr *t, Expr *f)
+		: cond(cond)
+		, t(t)
+		, f(f) { type = COND; }
+	void emit(Gen &g) const override;
+};
+
 struct Const : Expr {
 	Token t;
 	Const(const Token &t) : t(t) { type = CONST; }
 	void emit(Gen &g) const override;
 };
 
-// 
+// -------- class def -------- //
 
 class Parser
 {
@@ -151,14 +169,16 @@ class Parser
 	Expr *expr();
 	Node *statement();
 
-	Stmt *returnstatement();
-	Stmt *function();
-	Stmt *block();
+	Stmt *ret_stmt();
+	Stmt *func();
+	Stmt *blk();
 	Stmt *decl();
+	Stmt *if_stmt();
 
 	Expr *lval();
 	Expr *assign();
 
+	Expr *cond();
 	Expr *op_or();
 	Expr *op_and();
 	Expr *bitwise_or();

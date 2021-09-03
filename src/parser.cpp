@@ -9,9 +9,9 @@ static bool is_type(TokType t)
 
 static bool is_assign(TokType t)
 {
-	return t == '=' || t == OP_ADD_SET || t == OP_SUB_SET || t == OP_MUL_SET || t == OP_DIV_SET
-		|| t == OP_MOD_SET || t == OP_AND_SET || t == OP_XOR_SET || t == OP_OR_SET
-		|| t == OP_SHR_SET || t == OP_SHL_SET;
+	return t == '=' || t == OP_ADD_SET || t == OP_SUB_SET || t == OP_MUL_SET
+		|| t == OP_DIV_SET || t == OP_MOD_SET || t == OP_AND_SET || t == OP_XOR_SET
+		|| t == OP_OR_SET || t == OP_SHR_SET || t == OP_SHL_SET;
 }
 
 // -------- grammars -------- //
@@ -22,32 +22,32 @@ Expr *Parser::expr()
 	if (is_assign(l.peek(2).type))
 	 	return assign();
 	else
-		return op_or();
+		return cond();
 }
 
-// ret | expr | decl
+// ( ret | expr | if ) ';'
 Node *Parser::statement()
 {
 	Node *out = nullptr;
+	bool semi = true;
 
 	switch (l.peek_next().type) {
-		case KEY_RETURN: out = returnstatement(); break;
-		case KEY_VOID: case KEY_BOOL: case KEY_CHAR: case KEY_INT: case KEY_FLOAT:
-			out = decl(); break;
-		default:
-			out = expr(); break;
+		case KEY_RETURN: out = ret_stmt(); break;
+		case KEY_IF: out = if_stmt(); semi = false; break;
+		default: out = expr(); break;
 
 		// case IDENTIFIER: case INT_CONSTANT: case FP_CONSTANT: case STR_CONSTANT: case '!': case '~': case '-': case '(':
 			// l.lex_err(std::string("Invalid token ") + l.getname(l.peek_next().type));
 	}
 
-	l.eat(static_cast<TokType>(';'));
+	if (semi)
+		l.eat((TokType)';');
 
 	return out;
 }
 
 // 'return' expr
-Stmt *Parser::returnstatement()
+Stmt *Parser::ret_stmt()
 {
 	l.eat(KEY_RETURN);
 
@@ -58,8 +58,9 @@ Stmt *Parser::returnstatement()
 	return out;
 }
 
-// type IDENTIFIER '(' {type IDENTIFIER,} ')' '{' blk '}'
-Stmt *Parser::function()
+// params = [ ( type IDENTIFIER ) | ( type IDENTIFIER, params ) ]
+// type IDENTIFIER '(' params ')' blk
+Stmt *Parser::func()
 {
 	Func *out = new Func;
 
@@ -76,7 +77,7 @@ Stmt *Parser::function()
 
 	out->name = s.vec.size() - 1;
 
-	l.eat(static_cast<TokType>('('));
+	l.eat((TokType)'(');
 
 	while (l.peek_next().type != ')')
 	{
@@ -93,40 +94,44 @@ Stmt *Parser::function()
 		out->params.push_back(Symbol(t, str, out->name.entry));
 
 		if (l.peek_next().type != ')')
-			l.eat(static_cast<TokType>(','));
+			l.eat((TokType)',');
 	}
 
-	l.eat(static_cast<TokType>(')'));
+	l.eat((TokType)')');
 
 	cur_func = out;
 
-	out->blk = block();
+	out->blk = blk();
 
 	cur_func = nullptr;
 
 	return out;
 }
 
-// stmt | '{' stmt* '}'
-Stmt *Parser::block()
+// '{' { stmt | decl } '}'
+Stmt *Parser::blk()
 {
 	Block *out = new Block;
 
-	if (l.peek_next().type == '{')
+	l.eat((TokType)'{');
+
+	TokType t = l.peek_next().type;
+	while (t && t != '}')
 	{
-		l.eat(static_cast<TokType>('{'));
-		while (l.peek_next().type && l.peek_next().type != '}')
-				out->vec.push_back(statement());
-		
-		l.eat(static_cast<TokType>('}'));
+		if (is_type(t))
+			out->vec.push_back(decl());
+		else
+			out->vec.push_back(statement());
+
+		t = l.peek_next().type;
 	}
-	else
-		out->vec.push_back(statement());
+		
+	l.eat((TokType)'}');
 
 	return out;
 }
 
-// int IDENTIFIER ('=' expr)?
+// int IDENTIFIER [ '=' expr ] ';'
 Stmt *Parser::decl()
 {
 	TokType t = l.peek_next().type;
@@ -149,8 +154,40 @@ Stmt *Parser::decl()
 
 	if (l.peek_next().type == '=')
 	{
-		l.eat(static_cast<TokType>('='));
+		l.eat((TokType)'=');
 		out->expr = expr();
+	}
+
+	l.eat((TokType)';');
+
+	return out;
+}
+
+// 'if' '(' expr ')' ( stmt | blk ) [ 'else' ( stmt | blk) ]
+Stmt *Parser::if_stmt()
+{
+	If *out = new If;
+
+	l.eat(KEY_IF);
+	l.eat((TokType)'(');
+
+	out->cond = expr();
+
+	l.eat((TokType)')');
+
+	/*if (l.peek_next().type == '{')
+		out->if_blk = blk();
+	else*/
+		out->if_blk = statement();
+
+	if (l.peek_next().type == KEY_ELSE)
+	{
+		l.eat(KEY_ELSE);
+
+		/*if (l.peek_next().type == '{')
+			out->else_blk = blk();
+		else*/
+			out->else_blk = statement();
 	}
 
 	return out;
@@ -164,7 +201,7 @@ Expr *Parser::lval()
 	return new Var(s.lookup(std::get<std::string>(l.eat(IDENTIFIER).val)));
 }
 
-// lval [ assign expr ]
+// lval assign expr
 Expr *Parser::assign()
 {
 	Expr *lv = lval();
@@ -180,7 +217,7 @@ Expr *Parser::assign()
 
 // -------- binary operations -------- //
 
-#define BINEXP(func, call_func, type_eval)  \
+#define BINEXP(func, call_func, type_eval)  	  \
 	Expr *Parser::func()						  \
 	{											  \
 		Expr *out = call_func();				  \
@@ -195,6 +232,25 @@ Expr *Parser::assign()
 												  \
 		return out;								  \
 	}
+
+// op_or [ '?' expr ':' cond ]
+Expr *Parser::cond()
+{
+	Expr *c = op_or();
+
+	if (l.peek_next().type == '?')
+	{
+		l.eat((TokType)'?');
+
+		Expr *t = expr();
+
+		l.eat((TokType)':');
+
+		return new Cond(c, t, cond());
+	}
+	else
+		return c;
+}
 
 // op_and { '||' op_and }
 BINEXP(op_or, op_and, t == OP_OR)
@@ -252,7 +308,6 @@ Expr *Parser::postfix()
 	Expr *p = primary();
 
 	TokType t = l.peek_next().type;
-	std::cout << "postfix: " << Lexer::getname(t) << '\n';
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
@@ -277,9 +332,9 @@ Expr *Parser::primary()
 		return new Var(s.lookup(std::get<std::string>(l.eat(IDENTIFIER).val)));
 	else if (t == '(')
 	{
-		l.eat(static_cast<TokType>('('));
+		l.eat((TokType)('('));
 		Expr *out = expr();
-		l.eat(static_cast<TokType>(')'));
+		l.eat((TokType)(')'));
 
 		return out;
 	}
@@ -296,7 +351,7 @@ Block *Parser::parse()
 	Block *out = new Block;
 
 	while (l.peek_next().type)
-		out->vec.push_back(function());
+		out->vec.push_back(func());
 	
 	return out;
 }

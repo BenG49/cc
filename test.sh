@@ -5,9 +5,11 @@ if [[ $# -lt 2 ]]; then
 	exit 1
 fi
 
+# arg 2 is test file
 gcc $2 -o test.out
 
-program_output=`./$1 $2 2>/dev/null`
+# arg 1 is executable
+program_output=`./$1 2>/dev/null`
 program_exit_code=$?
 
 test_output=`./test.out 2>/dev/null`

@@ -25,14 +25,22 @@ void prettyprint(const Node *ast, int tabs, const SymTab &s)
                 prettyprint(n, tabs + 1, s);
             break;
 
-        /*case IF:
+        case IF:
             puts("IF");
-            prettyprint(((If *)ast)->cond, tabs + 1);
+            prettyprint(((If*)ast)->cond, tabs + 1, s);
+
+            ptabs(tabs);
             puts("THEN");
-            prettyprint(((If *)ast)->if_blk, tabs + 1);
-            puts("ELSE");
-            prettyprint(((If *)ast)->else_blk, tabs + 1);
-            break;*/
+            prettyprint(((If*)ast)->if_blk, tabs + 1, s);
+
+            if (((If*)ast)->else_blk)
+            {
+                ptabs(tabs);
+                puts("ELSE");
+                prettyprint(((If*)ast)->else_blk, tabs + 1, s);
+            }
+
+            break;
 
         case FUNC:
             printf("FUNC TYPE(%s)", Lexer::getname(s.vec[((Func*)ast)->name.entry].type));
@@ -91,6 +99,20 @@ void prettyprint(const Node *ast, int tabs, const SymTab &s)
             printf("VAR NAME(%s)\n", s.vec[((Var*)ast)->entry].name.c_str());
             break;
         
+        case COND:
+            puts("IF");
+            prettyprint(((Cond*)ast)->cond, tabs + 1, s);
+
+            ptabs(tabs);
+            puts("THEN");
+            prettyprint(((Cond*)ast)->t, tabs + 1, s);
+
+            ptabs(tabs);
+            puts("ELSE");
+            prettyprint(((Cond*)ast)->f, tabs + 1, s);
+
+            break;
+        
         default: printf("megacringe %d\n", ast->type); break;
     };
 }
@@ -106,7 +128,9 @@ int main(int argc, const char *argv[]) {
     SymTab s;
     Parser p(l, s);
     Block *b = p.parse();
+
     prettyprint(b, 0, s);
+
     Gen g("out.s", s);
     g.x86_codegen(b);
 

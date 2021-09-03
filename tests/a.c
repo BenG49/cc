@@ -1,6 +1,5 @@
 int main()
 {
-    int i = 10;
-    int j = 2 + i++;
-    return j;
+    int i = 3;
+    return (i != 3) ? 1 : 2;
 }
