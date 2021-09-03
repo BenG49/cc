@@ -242,7 +242,7 @@ void UnOp::emit(Gen &g) const
 		case OP_DEC: g.emit("dec %eax"); break;
 
 		case '!':
-			g.emit("test, %eax, %eax"); // test if operand is 0
+			g.emit("test %eax, %eax"); // test if operand is 0
 			g.emit("mov $0, %eax"); // cannot use xor because it will reset flags
 			g.emit("setz %al"); // if operand was zero, set to one
 			break;

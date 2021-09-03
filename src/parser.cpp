@@ -31,7 +31,7 @@ Node *Parser::statement()
 	Node *out = nullptr;
 	bool semi = true;
 
-	switch (l.peek_next().type) {
+	switch (l.pnxt().type) {
 		case KEY_RETURN: out = ret_stmt(); break;
 		case KEY_IF: out = if_stmt(); semi = false; break;
 		default: out = expr(); break;
@@ -64,26 +64,28 @@ Stmt *Parser::func()
 {
 	Func *out = new Func;
 
-	TokType t = l.peek_next().type;
+	Token tok = l.pnxt();
+	TokType t = tok.type;
 	if (!is_type(t))
-		l.lex_err("Expected function return type");
+		parse_err("Expected function return type", tok);
 
 	// eat type
 	l.eat(t);
 		
-	// get func name
-	// s.vec.emplace_back(t, std::get<std::string>(l.eat(IDENTIFIER).val), -1);
-	s.vec.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val), -1));
+	// get func name, add to sym tab
+	s.vec.emplace_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val), -1));
 
 	out->name = s.vec.size() - 1;
 
 	l.eat((TokType)'(');
 
-	while (l.peek_next().type != ')')
+	while (l.pnxt().type != ')')
 	{
-		t = l.peek_next().type;
+		tok = l.pnxt();
+		t = tok.type;
+
 		if (!is_type(t) && t != KEY_VOID)
-			l.lex_err("Expected function param type");
+			parse_err("Expected function param type", tok);
 		
 		l.eat(t);
 
@@ -93,7 +95,7 @@ Stmt *Parser::func()
 		// out->params.emplace_back(t, str, out->name);
 		out->params.push_back(Symbol(t, str, out->name.entry));
 
-		if (l.peek_next().type != ')')
+		if (l.pnxt().type != ')')
 			l.eat((TokType)',');
 	}
 
@@ -115,7 +117,7 @@ Stmt *Parser::blk()
 
 	l.eat((TokType)'{');
 
-	TokType t = l.peek_next().type;
+	TokType t = l.pnxt().type;
 	while (t && t != '}')
 	{
 		if (is_type(t))
@@ -123,7 +125,7 @@ Stmt *Parser::blk()
 		else
 			out->vec.push_back(statement());
 
-		t = l.peek_next().type;
+		t = l.pnxt().type;
 	}
 		
 	l.eat((TokType)'}');
@@ -134,14 +136,15 @@ Stmt *Parser::blk()
 // int IDENTIFIER [ '=' expr ] ';'
 Stmt *Parser::decl()
 {
-	TokType t = l.peek_next().type;
+	Token tok = l.pnxt();
+	TokType t = tok.type;
 	l.eat(KEY_INT);
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
 	for (Symbol &s : s.vec)
 		if (s.name == name)
-			l.lex_err("Redefinition of variable " + name);
+			parse_err("Redefinition of variable " + name, tok);
 
 	s.vec.emplace_back(t, name, cur_func->name.entry);
 
@@ -152,7 +155,7 @@ Stmt *Parser::decl()
 
 	Decl *out = new Decl(Var(s.lookup(s.vec.back().name)));
 
-	if (l.peek_next().type == '=')
+	if (l.pnxt().type == '=')
 	{
 		l.eat((TokType)'=');
 		out->expr = expr();
@@ -180,7 +183,7 @@ Stmt *Parser::if_stmt()
 	else*/
 		out->if_blk = statement();
 
-	if (l.peek_next().type == KEY_ELSE)
+	if (l.pnxt().type == KEY_ELSE)
 	{
 		l.eat(KEY_ELSE);
 
@@ -206,9 +209,10 @@ Expr *Parser::assign()
 {
 	Expr *lv = lval();
 
-	TokType t = l.peek_next().type;
+	Token tok = l.pnxt();
+	TokType t = tok.type;
 	if (!is_assign(t))
-		l.lex_err("Expected assignment operator");
+		parse_err("Expected assignment operator", tok);
 	
 	l.eat(t);
 
@@ -221,13 +225,13 @@ Expr *Parser::assign()
 	Expr *Parser::func()						  \
 	{											  \
 		Expr *out = call_func();				  \
-		TokType t = l.peek_next().type;			  \
+		TokType t = l.pnxt().type;				  \
 												  \
 		while (type_eval)						  \
 		{										  \
 			l.eat(t);							  \
 			out = new BinOp(t, out, call_func()); \
-			t = l.peek_next().type;				  \
+			t = l.pnxt().type;					  \
 		}										  \
 												  \
 		return out;								  \
@@ -238,7 +242,7 @@ Expr *Parser::cond()
 {
 	Expr *c = op_or();
 
-	if (l.peek_next().type == '?')
+	if (l.pnxt().type == '?')
 	{
 		l.eat((TokType)'?');
 
@@ -285,7 +289,7 @@ BINEXP(factor, unop, t == '/' || t == '*' || t == '%')
 // postfix | ( OP_INC | OP_DEC ) lval | ( '!' | '~' | '-' ) unop
 Expr *Parser::unop()
 {
-	TokType t = l.peek_next().type;
+	TokType t = l.pnxt().type;
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
@@ -307,7 +311,7 @@ Expr *Parser::postfix()
 {
 	Expr *p = primary();
 
-	TokType t = l.peek_next().type;
+	TokType t = l.pnxt().type;
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
@@ -320,7 +324,7 @@ Expr *Parser::postfix()
 // INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
 Expr *Parser::primary()
 {
-	Token tok = l.peek_next();
+	Token tok = l.pnxt();
 	TokType t = tok.type;
 
 	if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT)
@@ -339,7 +343,7 @@ Expr *Parser::primary()
 		return out;
 	}
 
-	l.lex_err(std::string("Invalid expression ") + l.getname(t));
+	parse_err(std::string("Invalid expression ") + l.getname(t), tok);
 	return nullptr;
 }
 
@@ -350,8 +354,18 @@ Block *Parser::parse()
 {
 	Block *out = new Block;
 
-	while (l.peek_next().type)
+	while (l.pnxt().type)
 		out->vec.push_back(func());
 	
 	return out;
+}
+
+void Parser::parse_err(const std::string &msg, const Token &err_tok)
+{
+	std::cerr << "Error: " << msg
+			  << " at line " << err_tok.line
+			  << ", col " << err_tok.col
+			  << '\n';
+
+	exit(1);
 }

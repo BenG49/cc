@@ -14,7 +14,7 @@ BIN_TARGET=prog.out
 
 TEST_SCRIPT=test.sh
 
-.PHONY: run test clean debug
+.PHONY: test clean debug
 
 $(TARGET): $(OBJS) $(HDRS) main.cpp
 	$(CC) $(CFLAGS) -o $@ $(OBJS) main.cpp
@@ -26,10 +26,6 @@ test: $(TARGET)
 	./$< $(ARGS)
 	gcc $(ASM_TARGET) -g -o $(BIN_TARGET)
 	./test.sh $(BIN_TARGET) $(ARGS)
-
-run: $(TARGET)
-	./$< $(ARGS)
-	gcc $(ASM_TARGET) -g -o $(BIN_TARGET)
 
 clean:
 	$(RM) $(TARGET)

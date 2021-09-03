@@ -62,6 +62,9 @@ Lexer::Lexer(const std::string &filename)
 		lex_err("File could not be read!");
 
 	file.close();
+
+	// move past newlines
+	count(0);
 }
 
 Lexer::~Lexer()
@@ -71,7 +74,7 @@ Lexer::~Lexer()
 
 Token Lexer::eat(TokType expected)
 {
-	Token next = peek_next();
+	Token next = pnxt();
 	if (next.type != expected)
 	{
 		std::stringstream out;
@@ -384,6 +387,10 @@ int Lexer::count(int count)
 
 bool Lexer::keyword(const char *keyword)
 {
+	// if prev char is num or alpha
+	if (index > 0 && std::isalnum(buf[index - 1]))
+		return false;
+
 	const char *buf_ptr = buf + index;
 
 	while (*keyword && *buf_ptr)
@@ -392,7 +399,8 @@ bool Lexer::keyword(const char *keyword)
 			return false;
 	}
 
-	if (!*buf_ptr)
+	// if char after is num or alpha
+	if (*buf_ptr && std::isalnum(*buf_ptr))
 		return false;
 
 	return true;
@@ -454,7 +462,7 @@ void Lexer::lex_err(const std::string &msg)
 	exit(1);
 }
 
-Token Lexer::peek_next() { return Lexer::peek(1); }
+Token Lexer::pnxt() { return Lexer::peek(1); }
 Token Lexer::peek(unsigned lookahead)
 {
 	// token doesn't exist in buffer

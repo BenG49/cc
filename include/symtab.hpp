@@ -16,7 +16,7 @@ struct Symbol {
 };
 
 struct SymTab {
-    std::vector<Symbol> vec;
+	std::vector<Symbol> vec;
 
 	int lookup(const std::string &name) const
 	{

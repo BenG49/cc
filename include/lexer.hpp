@@ -5,7 +5,7 @@
 #include <string>
 #include <deque>
 
-#define TOKS                    \
+#define TOKS                      \
 	DEF(KEY_BOOL, "bool")         \
 	DEF(KEY_CONST, "const")       \
 	DEF(KEY_CHAR, "char")         \
@@ -37,7 +37,7 @@
 	DEF(OP_DEC, "--")             \
 	DEF(OP_PTR, "->")             \
 	DEF(OP_AND, "&&")             \
-	DEF(OP_OR, "||")             \
+	DEF(OP_OR, "||")              \
 	DEF(OP_LE, "<=")              \
 	DEF(OP_GE, ">=")              \
 	DEF(OP_EQ, "==")              \
@@ -66,14 +66,18 @@ struct Token
 
 	std::variant<long long, double, std::string> val;
 
-	bool fp;
+	Token(TokType type, int line, int col, int char_count)
+		: type(type)
+		, line(line)
+		, col(col)
+		, char_count(char_count) {}
 
-	Token(TokType type, int line, int col, int char_count, bool fp = false)
-		: type(type), line(line), col(col), char_count(char_count), fp(fp) {}
-	
 	Token(const Token &t)
 		: type(t.type)
-		, val(t.val) { }
+		, line(t.line)
+		, col(t.col)
+		, char_count(t.char_count)
+		, val(t.val) {}
 };
 
 class Lexer
@@ -95,7 +99,8 @@ public:
 	~Lexer();
 
 	Token eat(TokType expected);
-	Token peek_next();
+	// peek next
+	Token pnxt();
 	// lookahead must be > 0
 	Token peek(unsigned lookahead);
 

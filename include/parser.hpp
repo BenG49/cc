@@ -193,6 +193,8 @@ class Parser
 	Expr *postfix();
 	Expr *primary();
 
+	void parse_err(const std::string &msg, const Token &err_tok);
+
 public:
 	Parser(Lexer &l, SymTab &s)
 		: l(l), s(s) {}
