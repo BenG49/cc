@@ -225,7 +225,7 @@ void BinOp::emit(Gen &g) const
 		default:
 			if (op == OP_EQ || op == OP_NE || op == OP_GE || op == '>' || op == OP_LE || op == '<')
 			{
-				g.emit("cmp %eax, %ecx");
+				g.emit("cmp %ecx, %eax");
 				g.emit("mov $0, %eax");
 
 				g.emit("set", false);
