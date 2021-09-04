@@ -36,7 +36,7 @@ struct Var : Expr {
 	int entry;
 	std::vector<Symbol> *vars;
 	Var() { type = VAR; }
-	Var(int entry, SymTab *scope)
+	Var(int entry, Scope *scope)
 		: entry(entry)
 		, vars(&scope->vec) { type = VAR; }
 	void emit(Gen &g) const override;
@@ -44,9 +44,10 @@ struct Var : Expr {
 
 struct Compound : Stmt {
 	std::vector<Node *> vec;
-	SymTab *scope;
-	Compound() { type = BLOCK; }
-	Compound(SymTab *scope) : scope(scope) { type = BLOCK; }
+	Scope *scope;
+	bool func;
+	Compound() : func(false) { type = BLOCK; }
+	Compound(Scope *scope) : scope(scope), func(false) { type = BLOCK; }
 	void emit(Gen &g) const override;
 };
 
@@ -79,10 +80,9 @@ struct While : Stmt {
 
 struct Func : Stmt {
 	Var name;
-	int offset;
 	std::vector<Symbol> params;
 	Compound *blk;
-	Func() : offset(0) { type = FUNC; }
+	Func() { type = FUNC; }
 	void emit(Gen &g) const override;
 };
 
@@ -171,8 +171,7 @@ class Parser
 {
 	Lexer &l;
 
-	int *bp_offset;
-	SymTab *scope;
+	Scope *scope;
 
 	Expr *expr();
 	Node *stmt();
@@ -206,8 +205,7 @@ class Parser
 public:
 	Parser(Lexer &l)
 		: l(l)
-		, bp_offset(nullptr)
-		, scope(new SymTab(nullptr, nullptr)) {}
+		, scope(new Scope(nullptr, 0)) {}
 
 	Compound *parse();
 };

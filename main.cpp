@@ -8,7 +8,7 @@ void ptabs(int count)
 		printf("  ");
 }
 
-void prettyprint(const Node *ast, int tabs, const SymTab &s)
+void prettyprint(const Node *ast, int tabs, const Scope &s)
 {
 	ptabs(tabs);
 

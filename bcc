@@ -2,6 +2,6 @@
 
 cc_path=/home/bg/Documents/Programming/cpp/cc
 
-$cc_path/cc.out $1
-&& gcc out.s -o ${1%.*}
+$cc_path/cc.out $1 &&
+gcc out.s -o ${1%.*}
 # && rm out.s

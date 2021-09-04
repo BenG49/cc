@@ -60,8 +60,7 @@ Node *Parser::stmt()
 Stmt *Parser::func()
 {
 	Func *out = new Func;
-	scope = new SymTab(scope, bp_offset);
-	bp_offset = &out->offset;
+	scope = new Scope(scope, scope->stack_index);
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
@@ -97,10 +96,9 @@ Stmt *Parser::func()
 
 	l.eat((TokType)')');
 
-	out->blk = compound();
-
 	// scope is reset in compound
-	bp_offset = nullptr;
+	out->blk = compound();
+	out->blk->func = true;
 
 	return out;
 }
@@ -122,10 +120,8 @@ Stmt *Parser::decl()
 
 	scope->vec.push_back(Symbol(t, name));
 
-	// only int for now
-	(*bp_offset) += 4;
-
-	scope->vec.back().bp_offset = *bp_offset;
+	// only 32 bit int for now
+	scope->vec.back().bp_offset = (scope->stack_index += 4);
 
 	Decl *out = new Decl(Var(scope->vec.size() - 1, scope));
 
@@ -176,7 +172,7 @@ Compound *Parser::compound(bool newscope)
 	Compound *out;
 
 	if (newscope)
-	 	out = new Compound(scope = new SymTab(scope, bp_offset));
+	 	out = new Compound(scope = new Scope(scope, scope->stack_index));
 	else
 	 	out = new Compound(scope);
 

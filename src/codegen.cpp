@@ -31,8 +31,28 @@ void Var::emit(Gen &g) const
 
 void Compound::emit(Gen &g) const
 {
+	if (scope->vec.size())
+	{
+		// allocate space on the stack
+		g.emit("sub $", false);
+		g.emit_int(scope->vec.size() * 4);
+		g.emit_append(", %rsp", true);
+	}
+
+	g.emit("");
+
 	for (Node *s : vec)
 		s->emit(g);
+
+	g.emit("");
+	
+	if (!func && scope->vec.size())
+	{
+		// dealloc vars for block
+		g.emit("add $", false);
+		g.emit_int(scope->vec.size() * 4);
+		g.emit_append(", %rsp", true);
+	}
 }
 
 void If::emit(Gen &g) const
@@ -82,20 +102,9 @@ void Func::emit(Gen &g) const
 	g.emit("push %rbp");
 	g.emit("mov %rsp, %rbp");
 
-	if (*blk->scope->bp_offset)
-	{
-		// allocate space on the stack
-		g.emit("sub $", false);
-		g.emit_int(*blk->scope->bp_offset);
-		g.emit_append(", %rsp", true);
-	}
-
-	g.emit("");
-
 	blk->emit(g);
 
 	// functions return 0 by default (standard in main, undefined for normal functions)
-	g.emit("");
 	g.emit("xor %eax, %eax");
 	g.func_epilogue();
 }
