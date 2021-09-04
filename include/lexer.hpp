@@ -7,8 +7,11 @@
 
 #define TOKS                      \
 	DEF(KEY_BOOL, "bool")         \
+	DEF(KEY_BREAK, "break")       \
 	DEF(KEY_CONST, "const")       \
+	DEF(KEY_CONT, "continue")     \
 	DEF(KEY_CHAR, "char")         \
+	DEF(KEY_DO, "do")			  \
 	DEF(KEY_ELSE, "else")         \
 	DEF(KEY_ENUM, "enum")         \
 	DEF(KEY_FLOAT, "float")       \

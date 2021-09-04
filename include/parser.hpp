@@ -9,10 +9,13 @@
 
 enum NodeType
 {
+	NONE,
 	BLOCK,
 	IF,
 	FOR,
+	FOR_DECL,
 	WHILE,
+	DO,
 	DECL,
 	ASSIGN,
 	FUNC,
@@ -23,6 +26,8 @@ enum NodeType
 	COND,
 	CONST,
 	VAR,
+	BREAK,
+	CONT,
 };
 
 struct Node {
@@ -65,18 +70,37 @@ struct If : Stmt {
 	void emit(Gen &g) const override;
 };
 
-/*struct For : Stmt {
-	Stmt *init, *inc, *blk;
-	Expr *cond;
+struct For : Stmt {
+	Expr *init, *cond;
+	Node *blk, *post;
 	For() { type = FOR; }
+	void emit(Gen &g) const override;
+};
+
+struct Decl;
+
+struct ForDecl : Stmt {
+	Scope *for_scope;
+	Decl *init;
+	Expr *cond;
+	Node *blk, *post;
+	ForDecl() { type = FOR_DECL; }
+	void emit(Gen &g) const override;
 };
 
 struct While : Stmt {
-	Stmt *blk;
+	Node *blk;
 	Expr *cond;
 	While() { type = WHILE; }
+	void emit(Gen &g) const override;
 };
-*/
+
+struct Do : Stmt {
+	Node *blk;
+	Expr *cond;
+	Do() { type = DO; }
+	void emit(Gen &g) const override;
+};
 
 struct Func : Stmt {
 	Var name;
@@ -171,14 +195,20 @@ class Parser
 {
 	Lexer &l;
 
+	// context
 	Scope *scope;
+	bool in_loop;
 
 	Expr *expr();
+	Expr *exp_option();
 	Node *stmt();
 
 	Stmt *func();
-	Stmt *decl();
+	Decl *decl();
 	Stmt *if_stmt();
+	Stmt *for_stmt();
+	Stmt *while_stmt();
+	Stmt *do_stmt();
 
 	Compound *compound(bool newscope=true);
 
@@ -205,7 +235,8 @@ class Parser
 public:
 	Parser(Lexer &l)
 		: l(l)
-		, scope(new Scope(nullptr, 0)) {}
+		, scope(new Scope(nullptr, 0))
+		, in_loop(false) {}
 
 	Compound *parse();
 };

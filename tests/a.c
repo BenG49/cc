@@ -1,10 +1,14 @@
 
 int main()
 {
-    int a = 2;
+    int sum = 0;
+    for (int i = 0; i < 10; ++i)
     {
-        a = 3;
-        int a = 0;
+        if (sum % 2)
+            continue;
+
+        sum += i;
     }
-    return a;
+
+    return sum;
 }

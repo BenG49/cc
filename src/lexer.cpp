@@ -385,10 +385,11 @@ int Lexer::count(int count)
 	return index;
 }
 
+// kinda scuffed method of finding if keywords arent bordering each other
 bool Lexer::keyword(const char *keyword)
 {
 	// if prev char is num or alpha
-	if (index > 0 && std::isalnum(buf[index - 1]))
+	if (std::isalnum(*keyword) && index > 0 && std::isalnum(buf[index - 1]))
 		return false;
 
 	const char *buf_ptr = buf + index;
@@ -400,7 +401,7 @@ bool Lexer::keyword(const char *keyword)
 	}
 
 	// if char after is num or alpha
-	if (*buf_ptr && std::isalnum(*buf_ptr))
+	if (std::isalnum(*keyword) && *buf_ptr && std::isalnum(*buf_ptr))
 		return false;
 
 	return true;

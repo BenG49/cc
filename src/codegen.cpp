@@ -65,7 +65,7 @@ void If::emit(Gen &g) const
 
 	// jz end/else
 	g.emit("test %eax, %eax");
-	g.emit("jz ", false); g.emit_append(lbl_else, true);
+	g.jmp("jz", lbl_else);
 	// if_blk
 	if_blk->emit(g);
 
@@ -73,21 +73,166 @@ void If::emit(Gen &g) const
 	if (else_blk)
 	{
 		else_end = g.get_label();
-		g.emit("jmp ", false); g.emit_append(else_end, true);
+		g.jmp("jmp", else_end);
 	}
 
 	// else:
-	g.emit_append(lbl_else); g.emit_append(":", true);
+	g.label(lbl_else);
 	
 	// (if else_blk then emit else_blk, emit else_end:)
 	if (else_blk)
 	{
 		else_blk->emit(g);
-		g.emit_append(else_end); g.emit_append(":", true);
+		g.label(else_end);
 		delete[] else_end;
 	}
 
 	delete[] lbl_else;
+}
+
+void For::emit(Gen &g) const
+{
+	const char *start = g.get_label();
+	const char *post_lbl = g.get_label();
+	const char *end = g.get_label();
+
+	g.break_lbl = end;
+	g.cont_lbl = post_lbl;
+
+	init->emit(g);
+
+	g.label(start);
+
+	if (cond->type != NONE)
+	{
+		cond->emit(g);
+		g.emit("test %eax, %eax");
+		g.jmp("jz", end);
+	}
+
+	blk->emit(g);
+
+	g.label(post_lbl);
+
+	post->emit(g);
+	g.jmp("jmp", start);
+
+	g.label(end);
+
+	g.break_lbl = nullptr;
+	g.cont_lbl = nullptr;
+	
+	delete[] start;
+	delete[] end;
+}
+
+void ForDecl::emit(Gen &g) const
+{
+
+	const char *start = g.get_label();
+	const char *post_lbl = g.get_label();
+	const char *end = g.get_label();
+
+	g.break_lbl = end;
+	g.cont_lbl = post_lbl;
+
+	// decl statement has its own scope, alloc var
+	if (for_scope->vec.size())
+	{
+		// allocate space on the stack
+		g.emit("sub $", false);
+		g.emit_int(for_scope->vec.size() * 4);
+		g.emit_append(", %rsp", true);
+	}
+
+	init->emit(g);
+
+	g.label(start);
+
+	if (cond->type != NONE)
+	{
+		cond->emit(g);
+		g.emit("test %eax, %eax");
+		g.jmp("jz", end);
+	}
+
+	blk->emit(g);
+	g.label(post_lbl);
+	post->emit(g);
+	g.jmp("jmp", start);
+
+	g.label(end);
+	
+	// decl statement has its own scope, dealloc var
+	if (for_scope->vec.size())
+	{
+		// dealloc vars for block
+		g.emit("add $", false);
+		g.emit_int(for_scope->vec.size() * 4);
+		g.emit_append(", %rsp", true);
+	}
+
+	g.break_lbl = nullptr;
+	g.cont_lbl = nullptr;
+	
+	delete[] start;
+	delete[] end;
+}
+
+void While::emit(Gen &g) const
+{
+	const char *start = g.get_label();
+	const char *end = g.get_label();
+
+	g.break_lbl = end;
+	g.cont_lbl = start;
+
+	g.label(start);
+
+	// eval cond
+	cond->emit(g);
+	g.emit("test %eax, %eax");
+	g.jmp("jz", end);
+
+	// eval block
+	blk->emit(g);
+	g.jmp("jmp", start);
+
+	g.label(end);
+
+	g.break_lbl = nullptr;
+	g.cont_lbl = nullptr;
+
+	delete[] start;
+	delete[] end;
+}
+
+void Do::emit(Gen &g) const
+{
+	const char *start = g.get_label();
+	const char *end = g.get_label();
+
+	g.break_lbl = end;
+	g.cont_lbl = start;
+
+	g.label(start);
+
+	// eval block
+	blk->emit(g);
+
+	// eval cond
+	cond->emit(g);
+	g.emit("test %eax, %eax");
+	// if true, jump back to start otherwise continue
+	g.jmp("jnz", start);
+
+	g.label(end);
+
+	g.break_lbl = nullptr;
+	g.cont_lbl = nullptr;
+
+	delete[] start;
+	delete[] end;
 }
 
 void Func::emit(Gen &g) const
@@ -95,8 +240,7 @@ void Func::emit(Gen &g) const
 	g.emit_append(".globl ");
 	g.emit_append((*name.vars)[name.entry].name.c_str(), true);
 
-	g.emit_append((*name.vars)[name.entry].name.c_str());
-	g.emit_append(":", true);
+	g.label((*name.vars)[name.entry].name.c_str());
 
 	// prologue
 	g.emit("push %rbp");
@@ -143,21 +287,21 @@ void BinOp::emit(Gen &g) const
 		lhs->emit(g);
 
 		g.emit("test %eax, %eax");
-		g.emit("jz ", false); g.emit_append(eval_rhs, true);
+		g.jmp("jz", eval_rhs);
 		// g.emit("mov $1, %eax");
 		g.emit("xor %eax, %eax");
 		g.emit("inc %eax");
-		g.emit("jmp ", false); g.emit_append(end, true);
+		g.jmp("jmp", end);
 
 		// eval rhs label
-		g.emit_append(eval_rhs, false); g.emit_append(":", true);
+		g.label(eval_rhs);
 		rhs->emit(g);
 		g.emit("test %eax, %eax");
 		g.emit("mov $0, %eax");
 		g.emit("setnz %al");
 		
 		// end label
-		g.emit_append(end, false); g.emit_append(":", true);
+		g.label(end);
 
 		delete[] eval_rhs;
 		delete[] end;
@@ -172,20 +316,20 @@ void BinOp::emit(Gen &g) const
 		lhs->emit(g);
 
 		g.emit("test %eax, %eax");
-		g.emit("jnz ", false); g.emit_append(eval_rhs, true);
+		g.jmp("jnz", eval_rhs);
 		// set eax to zero: failed and
 		g.emit("xor %eax, %eax");
-		g.emit("jmp ", false); g.emit_append(end, true);
+		g.jmp("jmp", end);
 
 		// eval rhs label
-		g.emit_append(eval_rhs, false); g.emit_append(":", true);
+		g.label(eval_rhs);
 		rhs->emit(g);
 		g.emit("test %eax, %eax");
 		g.emit("mov $0, %eax");
 		g.emit("setnz %al");
 		
 		// end label
-		g.emit_append(end, false); g.emit_append(":", true);
+		g.label(end);
 
 		delete[] eval_rhs;
 		delete[] end;
@@ -247,8 +391,17 @@ void UnOp::emit(Gen &g) const
 	switch (op) {
 		case '-': g.emit("neg %eax"); break;
 		case '~': g.emit("not %eax"); break;
-		case OP_INC: g.emit("inc %eax"); break;
-		case OP_DEC: g.emit("dec %eax"); break;
+		case OP_INC: case OP_DEC:
+			if (op == OP_DEC)
+				g.emit("dec %eax");
+			else
+				g.emit("inc %eax");
+
+			// update variable
+			g.emit("mov %eax, -", false);
+			g.emit_int((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
+			g.emit_append("(%rbp)", true);
+			break;
 
 		case '!':
 			g.emit("test %eax, %eax"); // test if operand is 0
@@ -346,18 +499,18 @@ void Cond::emit(Gen &g) const
 
 	// jz false
 	g.emit("test %eax, %eax");
-	g.emit("jz ", false); g.emit_append(lbl_else, true);
+	g.jmp("jz", lbl_else);
 	// t
 	t->emit(g);
 
 	else_end = g.get_label();
-	g.emit("jmp ", false); g.emit_append(else_end, true);
+	g.jmp("jmp", else_end);
 
 	// false:
-	g.emit_append(lbl_else); g.emit_append(":", true);
+	g.label(lbl_else);
 	
 	f->emit(g);
-	g.emit_append(else_end); g.emit_append(":", true);
+	g.label(else_end);
 
 	delete[] else_end;
 	delete[] lbl_else;
@@ -365,9 +518,21 @@ void Cond::emit(Gen &g) const
 
 void Const::emit(Gen &g) const
 {
-	g.emit("mov $", false);
-	g.emit_int(std::get<long long>(t.val));
-	g.emit_append(", %eax", true);
+	switch (t.type)
+	{
+		case INT_CONSTANT:
+			g.emit("mov $", false);
+			g.emit_int(std::get<long long>(t.val));
+			g.emit_append(", %eax", true);
+			break;
+		case KEY_BREAK:
+			g.jmp("jmp", g.break_lbl);
+			break;
+		case KEY_CONT:
+			g.jmp("jmp", g.cont_lbl);
+			break;
+		default: break;
+	}
 }
 
 // -------- gen -------- //
@@ -389,6 +554,16 @@ void Gen::emit_append(const char *str, bool nl)
 void Gen::emit_int(long long i) { out << i; }
 void Gen::emit_fp(double f) { out << f; }
 
+void Gen::label(const char *lbl)
+{
+	out << lbl << ":\n";
+}
+
+void Gen::jmp(const char *jmp, const char *lbl)
+{
+	out << '\t' << jmp << ' ' << lbl << '\n';
+}
+
 void Gen::comment(const char *str)
 {
 	out << "# " << str << '\n';
@@ -405,11 +580,11 @@ const char *Gen::get_label()
 {
 	char *buf = new char[10];
 	// yes
-	buf[0] = 'u';
-	buf[1] = 'w';
-	buf[2] = 'u';
+	buf[0] = 's';
+	buf[1] = 'u';
+	buf[2] = 's';
 
-	std::string tmp = std::to_string(label++);
+	std::string tmp = std::to_string(lbl_count++);
 
 	for (unsigned i = 0; i < tmp.size(); ++i)
 		buf[i + 3] = tmp[i];

@@ -11,7 +11,6 @@ TARGET=cc.out
 
 ASM_TARGET=out.s
 OBJ_TARGET=${ASM_TARGET:.s=.o}
-BIN_TARGET=prog.out
 
 TEST_SCRIPT=test.sh
 
@@ -30,7 +29,6 @@ clean:
 	$(RM) $(TARGET)
 	$(RM) $(OBJS)
 	$(RM) $(ASM_TARGET)
-	$(RM) $(BIN_TARGET)
 
 debug: $(TARGET)
 	gdb --args $< tests/a.c

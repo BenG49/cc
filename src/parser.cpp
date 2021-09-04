@@ -25,7 +25,20 @@ Expr *Parser::expr()
 		return cond();
 }
 
-// 'return' expr ';' | expr ';' | if  | compound
+// [ expr ]
+Expr *Parser::exp_option()
+{
+	if (l.pnxt().type == ';' || l.pnxt().type == ')')
+	{
+		Expr *tmp = new Expr;
+		tmp->type = NONE;
+		return tmp;
+	}
+	else
+		return expr();
+}
+
+// 'return' expr ';' | if  | compound | exp_option ';' | KEY_BREAK ';' | KEY_CONT ';' | for | while | do
 Node *Parser::stmt()
 {
 	Node *out = nullptr;
@@ -40,12 +53,38 @@ Node *Parser::stmt()
 			out = if_stmt();
 			semi = false;
 			break;
+		case KEY_FOR:
+			out = for_stmt();
+			semi = false;
+			break;
+		case KEY_WHILE:
+			out = while_stmt();
+			semi = false;
+			break;
+		case KEY_DO:
+			out = do_stmt();
+			semi = false;
+			break;
+		case KEY_BREAK:
+			if (!in_loop)
+				parse_err("Break cannot appear outside of loop body", l.pnxt());
+			out = new Const(l.eat(KEY_BREAK));
+			break;
+		case KEY_CONT:
+			if (!in_loop)
+				parse_err("Continue cannot appear outside of loop body", l.pnxt());
+			out = new Const(l.eat(KEY_CONT));
+			break;
 		case '{':
 			out = compound();
 			semi = false;
 			break;
-		default:
-			out = expr();
+		case ')': 
+			out = exp_option();
+			semi = false;
+			break;
+		case ';': default:
+			out = exp_option();
 			break;
 	}
 
@@ -71,7 +110,7 @@ Stmt *Parser::func()
 	l.eat(t);
 		
 	// get func name, add to sym tab
-	scope->vec.emplace_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val)));
+	scope->vec.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val)));
 
 	out->name = Var(scope->vec.size() - 1, scope);
 
@@ -104,7 +143,7 @@ Stmt *Parser::func()
 }
 
 // int IDENTIFIER [ '=' expr ] ';'
-Stmt *Parser::decl()
+Decl *Parser::decl()
 {
 	Token tok = l.pnxt();
 	TokType t = tok.type;
@@ -162,6 +201,93 @@ Stmt *Parser::if_stmt()
 		else*/
 			out->else_blk = stmt();
 	}
+
+	return out;
+}
+
+// KEY_FOR '(' ( exp_option ';' | decl ) exp_option ';' exp_option ')' stmt
+Stmt *Parser::for_stmt()
+{
+	l.eat(KEY_FOR);
+	l.eat((TokType)'(');
+
+	// parse decl
+	if (is_type(l.pnxt().type))
+	{
+		ForDecl *out = new ForDecl;
+
+		scope = new Scope(scope, scope->stack_index);
+		out->for_scope = scope;
+
+		out->init = decl();
+		out->cond = exp_option();
+		l.eat((TokType)';');
+		out->post = exp_option();
+		l.eat((TokType)')');
+
+		in_loop = true;
+		out->blk = stmt();
+		in_loop = false;
+
+		scope = scope->parent_scope;
+
+		return out;
+	}
+	else
+	{
+		For *out = new For;
+		out->init = exp_option();
+		l.eat((TokType)';');
+		out->cond = exp_option();
+		l.eat((TokType)';');
+		out->post = exp_option();
+		l.eat((TokType)')');
+
+		in_loop = true;
+		out->blk = stmt();
+		in_loop = false;
+
+		return out;
+	}
+}
+
+// KEY_WHILE '(' expr ')' stmt
+Stmt *Parser::while_stmt()
+{
+	While *out = new While;
+
+	l.eat(KEY_WHILE);
+	l.eat((TokType)'(');
+
+	out->cond = expr();
+
+	l.eat((TokType)')');
+
+	in_loop = true;
+	out->blk = stmt();
+	in_loop = false;
+
+	return out;
+}
+
+// KEY_DO stmt KEY_WHILE '(' expr ')' ';'
+Stmt *Parser::do_stmt()
+{
+	Do *out = new Do;
+
+	l.eat(KEY_DO);
+
+	in_loop = true;
+	out->blk = stmt();
+	in_loop = false;
+
+	l.eat(KEY_WHILE);
+	l.eat((TokType)'(');
+
+	out->cond = expr();
+
+	l.eat((TokType)')');
+	l.eat((TokType)';');
 
 	return out;
 }
