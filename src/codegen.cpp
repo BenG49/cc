@@ -25,11 +25,11 @@ static const char *get_cmp_set(TokType t)
 void Var::emit(Gen &g) const
 {
 	g.emit("movl -", false);
-	g.emit_int(g.s.vec[entry].ebp_offset);
+	g.emit_int((*vars)[entry].bp_offset);
 	g.emit_append("(%rbp), %eax", true);
 }
 
-void Block::emit(Gen &g) const
+void Compound::emit(Gen &g) const
 {
 	for (Node *s : vec)
 		s->emit(g);
@@ -73,20 +73,20 @@ void If::emit(Gen &g) const
 void Func::emit(Gen &g) const
 {
 	g.emit_append(".globl ");
-	g.emit_append(g.s.vec[name.entry].name.c_str(), true);
+	g.emit_append((*name.vars)[name.entry].name.c_str(), true);
 
-	g.emit_append(g.s.vec[name.entry].name.c_str());
+	g.emit_append((*name.vars)[name.entry].name.c_str());
 	g.emit_append(":", true);
 
 	// prologue
 	g.emit("push %rbp");
 	g.emit("mov %rsp, %rbp");
 
-	if (offset)
+	if (*blk->scope->bp_offset)
 	{
 		// allocate space on the stack
 		g.emit("sub $", false);
-		g.emit_int(offset);
+		g.emit_int(*blk->scope->bp_offset);
 		g.emit_append(", %rsp", true);
 	}
 
@@ -116,7 +116,7 @@ void Decl::emit(Gen &g) const
 
 		// move value into (ebp - offset)
 		g.emit("mov %eax, -", false);
-		g.emit_int(g.s.vec[v.entry].ebp_offset);
+		g.emit_int((*v.vars)[v.entry].bp_offset);
 		g.emit_append("(%rbp)", true);
 	}
 }
@@ -272,7 +272,7 @@ void Post::emit(Gen &g) const
 
 	// update variable
 	g.emit("mov %eax, -", false);
-	g.emit_int(g.s.vec[((Var*)operand)->entry].ebp_offset);
+	g.emit_int((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
 	g.emit_append("(%rbp)", true);
 
 	// reset register
@@ -322,7 +322,7 @@ void Assign::emit(Gen &g) const
 
 	// move eax into (ebp - offset)
 	g.emit("mov %eax, -", false);
-	g.emit_int(g.s.vec[((Var*)lval)->entry].ebp_offset);
+	g.emit_int((*((Var*)lval)->vars)[((Var*)lval)->entry].bp_offset);
 	g.emit_append("(%rbp)", true);
 	return;
 }
@@ -363,7 +363,7 @@ void Const::emit(Gen &g) const
 
 // -------- gen -------- //
 
-void Gen::x86_codegen(Block *ast) { ast->emit(*this); }
+void Gen::x86_codegen(Compound *ast) { ast->emit(*this); }
 
 void Gen::emit(const char *str, bool nl)
 {

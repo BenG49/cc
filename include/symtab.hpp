@@ -4,27 +4,38 @@
 
 #include <lexer.hpp>
 
+struct Func;
+
 struct Symbol {
 	TokType type;
 	std::string name;
-	int ebp_offset;
+	int bp_offset;
 
-	int scope_entry;
-
-	Symbol(TokType t, const std::string &name, int s)
-		: type(t), name(name), scope_entry(s) {}
+	Symbol(TokType t, const std::string &name)
+		: type(t), name(name) {}
 };
 
 struct SymTab {
+	SymTab *parent_scope;
+
+	// this is probably bad and wont work for globals but whatever
+	int *bp_offset;
+
 	std::vector<Symbol> vec;
 
-	int lookup(const std::string &name) const
+	SymTab(SymTab *parent_scope, int *bp_offset)
+		: parent_scope(parent_scope), bp_offset(bp_offset) {}
+
+	std::pair<int, SymTab*> get(const std::string &name) const
 	{
 		for (unsigned i = 0; i < vec.size(); ++i)
 		{
 			if (vec[i].name == name)
-				return i;
+				return std::pair<int, SymTab*>(i, (SymTab*)this);
 		}
+
+		if (parent_scope)
+			return parent_scope->get(name);
 
 		std::cerr << "Undefined variable " << name << '\n';
 		exit(1);

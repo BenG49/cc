@@ -1,9 +1,10 @@
 
 int main()
 {
-    // simple test to see if the universe still functions
-    if (1 == 1)
-        return 0;
-    else
-        return 1;
+    int a = 2;
+    {
+        a = 3;
+        int a = 0;
+    }
+    return a;
 }

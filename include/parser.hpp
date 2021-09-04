@@ -34,14 +34,19 @@ struct Expr : Node {};
 
 struct Var : Expr {
 	int entry;
+	std::vector<Symbol> *vars;
 	Var() { type = VAR; }
-	Var(int entry) : entry(entry) { type = VAR; }
+	Var(int entry, SymTab *scope)
+		: entry(entry)
+		, vars(&scope->vec) { type = VAR; }
 	void emit(Gen &g) const override;
 };
 
-struct Block : Stmt {
+struct Compound : Stmt {
 	std::vector<Node *> vec;
-	Block() { type = BLOCK; }
+	SymTab *scope;
+	Compound() { type = BLOCK; }
+	Compound(SymTab *scope) : scope(scope) { type = BLOCK; }
 	void emit(Gen &g) const override;
 };
 
@@ -74,9 +79,9 @@ struct While : Stmt {
 
 struct Func : Stmt {
 	Var name;
-	std::vector<Symbol> params;
-	Stmt *blk;
 	int offset;
+	std::vector<Symbol> params;
+	Compound *blk;
 	Func() : offset(0) { type = FUNC; }
 	void emit(Gen &g) const override;
 };
@@ -84,13 +89,16 @@ struct Func : Stmt {
 struct Ret : Stmt {
 	Expr *r;
 	Ret() { type = RET; }
+	Ret(Expr *r) : r(r) { type = RET; }
 	void emit(Gen &g) const override;
 };
 
 struct Decl : Stmt {
 	Var v;
 	Expr *expr;
-	Decl(Var v) : v(v) { type = DECL; }
+	Decl(Var v)
+		: v(v)
+		, expr(nullptr) { type = DECL; }
 	Decl(Var v, Expr *expr)
 		: v(v)
 		, expr(expr) { type = DECL; }
@@ -162,18 +170,18 @@ struct Const : Expr {
 class Parser
 {
 	Lexer &l;
-	SymTab &s;
 
-	Func *cur_func;
+	int *bp_offset;
+	SymTab *scope;
 
 	Expr *expr();
-	Node *statement();
+	Node *stmt();
 
-	Stmt *ret_stmt();
 	Stmt *func();
-	Stmt *blk();
 	Stmt *decl();
 	Stmt *if_stmt();
+
+	Compound *compound(bool newscope=true);
 
 	Expr *lval();
 	Expr *assign();
@@ -196,8 +204,10 @@ class Parser
 	void parse_err(const std::string &msg, const Token &err_tok);
 
 public:
-	Parser(Lexer &l, SymTab &s)
-		: l(l), s(s) {}
+	Parser(Lexer &l)
+		: l(l)
+		, bp_offset(nullptr)
+		, scope(new SymTab(nullptr, nullptr)) {}
 
-	Block *parse();
+	Compound *parse();
 };

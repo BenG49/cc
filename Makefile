@@ -6,6 +6,7 @@ HDRS=$(shell find ./include/ -type f -name '*.hpp')
 OBJS=${SRCS:.cpp=.o}
 
 ARGS=
+TEST=
 TARGET=cc.out
 
 ASM_TARGET=out.s
@@ -23,9 +24,7 @@ $(TARGET): $(OBJS) $(HDRS) main.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: $(TARGET)
-	./$< $(ARGS)
-	gcc $(ASM_TARGET) -g -o $(BIN_TARGET)
-	./test.sh $(BIN_TARGET) $(ARGS)
+	cd ~/write_a_c_compiler; ./test_compiler.sh ~/Documents/Programming/cpp/cc/bcc $(TEST)
 
 clean:
 	$(RM) $(TARGET)
@@ -33,5 +32,5 @@ clean:
 	$(RM) $(ASM_TARGET)
 	$(RM) $(BIN_TARGET)
 
-debug: $(BIN_TARGET)
+debug: $(TARGET)
 	gdb --args $< tests/a.c

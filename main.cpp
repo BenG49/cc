@@ -21,7 +21,7 @@ void prettyprint(const Node *ast, int tabs, const SymTab &s)
 	switch (ast->type) {
 		case BLOCK:
 			puts("BLOCK:");
-			for (Node *n : ((Block*)ast)->vec)
+			for (Node *n : ((Compound*)ast)->vec)
 				prettyprint(n, tabs + 1, s);
 			break;
 
@@ -125,12 +125,11 @@ int main(int argc, const char *argv[]) {
 	}
 
 	Lexer l(argv[1]);
-	SymTab s;
-	Parser p(l, s);
-	Block *b = p.parse();
+	Parser p(l);
+	Compound *b = p.parse();
 
 	// prettyprint(b, 0, s);
 
-	Gen g("out.s", s);
+	Gen g("out.s");
 	g.x86_codegen(b);
 }

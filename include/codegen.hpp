@@ -18,7 +18,7 @@ extern const char *REG_H[GP_REGS_END];
 // idk if eip has 8 bit counterpart
 extern const char *REG_L[REG_COUNT - 1];
 
-struct Block;
+struct Compound;
 
 class Gen
 {
@@ -26,12 +26,11 @@ class Gen
 	int label;
 
 public:
-	Gen(const std::string &outfile, SymTab &s)
+	Gen(const std::string &outfile)
 		: out(outfile)
-		, label(0)
-		, s(s) {}
+		, label(0) {}
 
-	void x86_codegen(Block *ast);
+	void x86_codegen(Compound *ast);
 
 	void emit(const char *str, bool nl=true);
 	void emit_append(const char *str, bool nl=false);
@@ -42,6 +41,4 @@ public:
 	void func_epilogue();
 
 	const char *get_label();
-	
-	const SymTab &s;
 };

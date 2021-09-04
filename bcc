@@ -2,7 +2,6 @@
 
 cc_path=/home/bg/Documents/Programming/cpp/cc
 
-$cc_path/cc.out $1 &&
-# echo "bcc $1 ${1%.*}"
-gcc out.s -o ${1%.*} &&
-rm out.s
+$cc_path/cc.out $1
+&& gcc out.s -o ${1%.*}
+# && rm out.s
