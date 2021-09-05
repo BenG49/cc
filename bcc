@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-cc_path=/home/bg/Documents/Programming/cpp/cc
+# https://stackoverflow.com/questions/59895/how-can-i-get-the-source-directory-of-a-bash-script-from-within-the-script-itsel
+cc_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 $cc_path/cc.out $1 &&
 gcc out.s -g -o ${1%.*}

@@ -18,9 +18,7 @@ static const char *get_cmp_set(TokType t)
 
 void Var::emit(Gen &g) const
 {
-	g.emit("movl ", false);
-	g.emit_offset((*vars)[entry].bp_offset);
-	g.emit_append(", %eax", true);
+	mov(true, g);
 }
 
 void Compound::emit(Gen &g) const
@@ -262,9 +260,8 @@ void Decl::emit(Gen &g) const
 		expr->emit(g);
 
 		// move value into (ebp + offset)
-		g.emit("mov %eax, ", false);
-		g.emit_offset((*v.vars)[v.entry].bp_offset);
-		g.nl();
+		// note that this should always be on the stack instead of reg
+		v.mov(false, g);
 	}
 }
 
@@ -392,9 +389,7 @@ void UnOp::emit(Gen &g) const
 				g.emit("inc %eax");
 
 			// update variable
-			g.emit("mov %eax, ", false);
-			g.emit_offset((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
-			g.nl();
+			((Var*)operand)->mov(false, g);
 			break;
 
 		case '!':
@@ -427,9 +422,7 @@ void Post::emit(Gen &g) const
 	}
 
 	// update variable
-	g.emit("mov %eax, ", false);
-	g.emit_offset((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
-	g.nl();
+	((Var*)operand)->mov(false, g);
 
 	// reset register
 	g.emit("pop %rax");
@@ -477,9 +470,7 @@ void Assign::emit(Gen &g) const
 	}
 
 	// move eax into (ebp - offset)
-	g.emit("mov %eax, ", false);
-	g.emit_offset((*((Var*)lval)->vars)[((Var*)lval)->entry].bp_offset);
-	g.nl();
+	((Var*)lval)->mov(false, g);
 	return;
 }
 
@@ -510,13 +501,26 @@ void Cond::emit(Gen &g) const
 	delete[] lbl_else;
 }
 
-// cdecl calling convention
+// sysv calling convention
 void Call::emit(Gen &g) const
 {
-	// push params from right to left
 	if (params.size())
 	{
-		for (int i = params.size() - 1; i >= 0; --i)
+		// first 6 params go into registers
+		for (unsigned i = 0; i < params.size() && i < 6; ++i)
+		{
+			params[i]->emit(g);
+
+			// save prev reg - not very efficient, but works
+			g.emit("push ", false);
+			g.emit_append(Gen::SYSV_REG_LIST[i], true);
+
+			g.emit("mov %rax, ", false);
+			g.emit_append(Gen::SYSV_REG_LIST[i], true);
+		}
+
+		// rest are pushed from right to left
+		for (int i = params.size() - 1; i >= 6; --i)
 		{
 			params[i]->emit(g);
 			g.emit("push %rax");
@@ -527,11 +531,18 @@ void Call::emit(Gen &g) const
 	g.emit("call ", false);
 	g.emit_append((*func.vars)[func.entry].name.c_str(), true);
 
+	for (int i = std::min(5, (int)params.size() - 1); i >= 0; --i)
+	{
+		// restore prev reg - not very efficient, but works
+		g.emit("pop ", false);
+		g.emit_append(Gen::SYSV_REG_LIST[i], true);
+	}
+
 	// restore stack
-	if (params.size())
+	if (params.size() > 6)
 	{
 		g.emit("add $", false);
-		g.emit_int(params.size() * 4);
+		g.emit_int((params.size() - 6) * 4);
 		g.emit_append(", %rsp", true);
 	}
 }
@@ -584,18 +595,11 @@ void Gen::jmp(const char *jmp, const char *lbl)
 	out << '\t' << jmp << ' ' << lbl << '\n';
 }
 
+
 void Gen::comment(const char *str)
 {
 	out << "# " << str << '\n';
 };
-
-void Gen::emit_offset(int offset)
-{
-	if (offset == 0) 
-		out << "(%rbp)";
-	else
-		out << offset << "(%rbp)";
-}
 
 void Gen::nl() { out << '\n'; }
 
@@ -621,3 +625,12 @@ const char *Gen::get_label()
 
 	return buf;
 }
+
+const char *Gen::SYSV_REG_LIST[] = {
+	"%rdi",
+	"%rsi",
+	"%rdx",
+	"%rcx",
+	"%r8",
+	"%r9"
+};

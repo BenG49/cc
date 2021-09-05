@@ -26,7 +26,6 @@ public:
 	void label(const char *lbl);
 	void jmp(const char *jmp, const char *lbl);
 	void comment(const char *str);
-	void emit_offset(int offset);
 	void nl();
 
 	void func_epilogue();
@@ -36,4 +35,6 @@ public:
 	// kinda bad but whatever
 	const char *break_lbl;
 	const char *cont_lbl;
+
+	static const char *SYSV_REG_LIST[];
 };

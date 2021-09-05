@@ -14,6 +14,58 @@ static bool is_assign(TokType t)
 		|| t == OP_OR_SET || t == OP_SHR_SET || t == OP_SHL_SET;
 }
 
+// this code is horrible
+void Var::mov(bool from_var, Gen &g) const
+{
+	int val = (*vars)[entry].offset_or_reg;
+	bool reg = (*vars)[entry].reg;
+		
+	const char *tmp;
+
+	if (reg)
+	{
+		g.emit("mov ", false);
+		tmp = Gen::SYSV_REG_LIST[val];
+	}
+	else
+	{
+		// specify mov size for memory location
+		g.emit("movl ", false);
+
+		if (val == 0)
+			tmp = "(%rbp)";
+		else
+		{
+			tmp = new char[std::to_string(val).size() + 7];
+			sprintf((char*)tmp, "%d%s", val, "(%rbp)");
+		}
+	}
+
+	// get -> ax
+	if (from_var)
+	{
+		g.emit_append(tmp);
+		g.emit_append(", ");
+	}
+
+	if (reg) 
+		g.emit_append("%rax");
+	else
+		g.emit_append("%eax");
+
+	// ax -> get
+	if (!from_var)
+	{
+		g.emit_append(", ");
+		g.emit_append(tmp);
+	}
+		
+	g.nl();
+
+	if (!reg && val != 0)
+		delete[] tmp;
+}
+
 // -------- grammars -------- //
 
 // binop | assign
@@ -102,6 +154,7 @@ Stmt *Parser::func()
 	bool prev_declared = false;
 
 	Func *out = new Func;
+	Scope *globl = scope;
 	scope = new Scope(scope, scope->stack_index);
 
 	Token tok = l.pnxt();
@@ -114,12 +167,12 @@ Stmt *Parser::func()
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
-	prev_declared = scope->in_scope(name);
+	prev_declared = globl->in_scope(name);
 		
 	// get func name, add to sym tab
-	scope->vec.push_back(Symbol(t, name, out, 0));
+	globl->vec.push_back(Symbol(t, name, out, 0, false));
 
-	out->name = Var(scope->vec.size() - 1, scope);
+	out->name = Var(globl->vec.size() - 1, globl);
 
 	l.eat((TokType)'(');
 
@@ -136,7 +189,15 @@ Stmt *Parser::func()
 		l.eat(t);
 
 		// get param name
-		scope->vec.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val), out, (offset += 8)));
+		if (out->params.size() < 6)
+			scope->vec.push_back(Symbol(
+				t, std::get<std::string>(l.eat(IDENTIFIER).val),
+				out, out->params.size(), true));
+		else
+			scope->vec.push_back(Symbol(
+				t, std::get<std::string>(l.eat(IDENTIFIER).val),
+				out, (offset += 8), false));
+
 		out->params.push_back(Var(scope->vec.size() - 1, scope));
 
 		if (l.pnxt().type != ')')
@@ -151,7 +212,7 @@ Stmt *Parser::func()
 	
 	if (prev_declared)
 	{
-		for (Symbol &s : scope->vec)
+		for (Symbol &s : globl->vec)
 			// if a symbol is found with the same name
 			// if the symbol is a function
 			// if the function has different num of params than this function
@@ -167,11 +228,12 @@ Stmt *Parser::func()
 	{
 		l.eat((TokType)';');
 		out->blk = nullptr;
+		scope = scope->parent_scope;
 		return out;
 	}
 
 	// scope is reset in compound
-	out->blk = compound();
+	out->blk = compound(false);
 	out->blk->func = true;
 
 	return out;
@@ -191,7 +253,7 @@ Decl *Parser::decl()
 
 	Decl *out = new Decl(Var(scope->vec.size(), scope));
 
-	scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4)));
+	scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4), false));
 
 	if (l.pnxt().type == '=')
 	{
@@ -327,7 +389,7 @@ Compound *Parser::compound(bool newscope)
 	Compound *out;
 
 	if (newscope)
-	 	out = new Compound(scope = new Scope(scope, scope->stack_index));
+	 	out = new Compound((scope = new Scope(scope, scope->stack_index)));
 	else
 	 	out = new Compound(scope);
 

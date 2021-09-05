@@ -10,11 +10,14 @@ struct Node;
 struct Symbol {
 	TokType type;
 	std::string name;
-	int bp_offset;
+
+	bool reg;
+	int offset_or_reg;
+
 	Node *node;
 
-	Symbol(TokType t, const std::string &name, Node *node, int bp_offset)
-		: type(t), name(name), bp_offset(bp_offset), node(node) {}
+	Symbol(TokType t, const std::string &name, Node *node, int offset_or_reg, bool reg)
+		: type(t), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
 };
 
 // scope deallocates variables on stack after done, stack index is left the same
@@ -30,7 +33,7 @@ struct Scope {
 	
 	bool in_scope(const std::string &name) const
 	{
-		for (Symbol s : vec)
+		for (const Symbol &s : vec)
 			if (s.name == name)
 				return true;
 
@@ -48,7 +51,7 @@ struct Scope {
 		if (parent_scope)
 			return parent_scope->get(name);
 
-		std::cerr << "Undefined variable " << name << '\n';
+		std::cerr << "Undefined identifier " << name << '\n';
 		exit(1);
 	}
 };

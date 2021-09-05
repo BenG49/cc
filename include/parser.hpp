@@ -41,10 +41,13 @@ struct Expr : Node {};
 struct Var : Expr {
 	int entry;
 	std::vector<Symbol> *vars;
+
 	Var() { type = VAR; }
 	Var(int entry, Scope *scope)
 		: entry(entry)
 		, vars(&scope->vec) { type = VAR; }
+
+	void mov(bool from_var, Gen &g) const;
 	void emit(Gen &g) const override;
 };
 
