@@ -49,9 +49,9 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 			
 			for (unsigned i = 0; i < ((Func*)ast)->params.size(); ++i)
 			{
-				Symbol s = ((Func*)ast)->params.at(i);
+				Var s = ((Func*)ast)->params.at(i);
 				ptabs(tabs + 1);
-				printf("%d %s\n", s.type, s.name.c_str());
+				printf("%d %s\n", s.type, (*s.vars)[s.entry].name.c_str());
 			}
 
 			prettyprint(((Func*)ast)->blk, tabs + 1, s);

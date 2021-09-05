@@ -5,14 +5,16 @@
 #include <lexer.hpp>
 
 struct Func;
+struct Node;
 
 struct Symbol {
 	TokType type;
 	std::string name;
 	int bp_offset;
+	Node *node;
 
-	Symbol(TokType t, const std::string &name)
-		: type(t), name(name) {}
+	Symbol(TokType t, const std::string &name, Node *node, int bp_offset)
+		: type(t), name(name), bp_offset(bp_offset), node(node) {}
 };
 
 // scope deallocates variables on stack after done, stack index is left the same

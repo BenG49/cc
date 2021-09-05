@@ -5,19 +5,6 @@
 
 #include <symtab.hpp>
 
-enum Reg {
-	A, B, C, D, SP, BP, DI, SI, IP, REG_COUNT
-};
-
-const Reg GP_REGS_END = SP;
-
-extern const char *REG_64[REG_COUNT];
-extern const char *REG_32[REG_COUNT];
-extern const char *REG_16[REG_COUNT];
-extern const char *REG_H[GP_REGS_END];
-// idk if eip has 8 bit counterpart
-extern const char *REG_L[REG_COUNT - 1];
-
 struct Compound;
 
 class Gen
@@ -39,6 +26,8 @@ public:
 	void label(const char *lbl);
 	void jmp(const char *jmp, const char *lbl);
 	void comment(const char *str);
+	void emit_offset(int offset);
+	void nl();
 
 	void func_epilogue();
 

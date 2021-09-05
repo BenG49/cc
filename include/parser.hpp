@@ -28,6 +28,7 @@ enum NodeType
 	VAR,
 	BREAK,
 	CONT,
+	CALL,
 };
 
 struct Node {
@@ -104,7 +105,7 @@ struct Do : Stmt {
 
 struct Func : Stmt {
 	Var name;
-	std::vector<Symbol> params;
+	std::vector<Var> params;
 	Compound *blk;
 	Func() { type = FUNC; }
 	void emit(Gen &g) const override;
@@ -183,6 +184,13 @@ struct Cond : Expr {
 	void emit(Gen &g) const override;
 };
 
+struct Call : Expr {
+	Var func;
+	std::vector<Expr*> params;
+	Call() { type = CALL; }
+	void emit(Gen &g) const override;
+};
+
 struct Const : Expr {
 	Token t;
 	Const(const Token &t) : t(t) { type = CONST; }
@@ -229,6 +237,7 @@ class Parser
 	Expr *unop();
 	Expr *postfix();
 	Expr *primary();
+	Expr *call();
 
 	void parse_err(const std::string &msg, const Token &err_tok);
 

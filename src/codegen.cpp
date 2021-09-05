@@ -1,12 +1,6 @@
 #include <codegen.hpp>
 #include <parser.hpp>
 
-const char *REG_64[REG_COUNT] = { "rax", "rbx", "rcx", "rdx", "rsp", "rbp", "rdi", "rsi", "rip" };
-const char *REG_32[REG_COUNT] = { "eax", "ebx", "ecx", "edx", "esp", "ebp", "edi", "esi", "eip" };
-const char *REG_16[REG_COUNT] = { "ax", "bx", "cx", "dx", "sp", "bp", "di", "si", "ip" };
-const char *REG_H[GP_REGS_END] = { "ah", "bh", "ch", "dh" };
-const char *REG_L[REG_COUNT - 1] = { "al", "bl", "cl", "dl", "spl", "bpl", "dil", "sil" };
-
 static const char *get_cmp_set(TokType t)
 {
 	switch (t) {
@@ -24,9 +18,9 @@ static const char *get_cmp_set(TokType t)
 
 void Var::emit(Gen &g) const
 {
-	g.emit("movl -", false);
-	g.emit_int((*vars)[entry].bp_offset);
-	g.emit_append("(%rbp), %eax", true);
+	g.emit("movl ", false);
+	g.emit_offset((*vars)[entry].bp_offset);
+	g.emit_append(", %eax", true);
 }
 
 void Compound::emit(Gen &g) const
@@ -39,12 +33,8 @@ void Compound::emit(Gen &g) const
 		g.emit_append(", %rsp", true);
 	}
 
-	g.emit("");
-
 	for (Node *s : vec)
 		s->emit(g);
-
-	g.emit("");
 	
 	if (!func && scope->vec.size())
 	{
@@ -237,7 +227,11 @@ void Do::emit(Gen &g) const
 
 void Func::emit(Gen &g) const
 {
-	g.emit_append(".globl ");
+	// forward declaration
+	if (!blk)
+		return;
+
+	g.emit_append("\n.globl ");
 	g.emit_append((*name.vars)[name.entry].name.c_str(), true);
 
 	g.label((*name.vars)[name.entry].name.c_str());
@@ -267,10 +261,10 @@ void Decl::emit(Gen &g) const
 	{
 		expr->emit(g);
 
-		// move value into (ebp - offset)
-		g.emit("mov %eax, -", false);
-		g.emit_int((*v.vars)[v.entry].bp_offset);
-		g.emit_append("(%rbp)", true);
+		// move value into (ebp + offset)
+		g.emit("mov %eax, ", false);
+		g.emit_offset((*v.vars)[v.entry].bp_offset);
+		g.nl();
 	}
 }
 
@@ -398,9 +392,9 @@ void UnOp::emit(Gen &g) const
 				g.emit("inc %eax");
 
 			// update variable
-			g.emit("mov %eax, -", false);
-			g.emit_int((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
-			g.emit_append("(%rbp)", true);
+			g.emit("mov %eax, ", false);
+			g.emit_offset((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
+			g.nl();
 			break;
 
 		case '!':
@@ -433,9 +427,9 @@ void Post::emit(Gen &g) const
 	}
 
 	// update variable
-	g.emit("mov %eax, -", false);
-	g.emit_int((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
-	g.emit_append("(%rbp)", true);
+	g.emit("mov %eax, ", false);
+	g.emit_offset((*((Var*)operand)->vars)[((Var*)operand)->entry].bp_offset);
+	g.nl();
 
 	// reset register
 	g.emit("pop %rax");
@@ -483,9 +477,9 @@ void Assign::emit(Gen &g) const
 	}
 
 	// move eax into (ebp - offset)
-	g.emit("mov %eax, -", false);
-	g.emit_int((*((Var*)lval)->vars)[((Var*)lval)->entry].bp_offset);
-	g.emit_append("(%rbp)", true);
+	g.emit("mov %eax, ", false);
+	g.emit_offset((*((Var*)lval)->vars)[((Var*)lval)->entry].bp_offset);
+	g.nl();
 	return;
 }
 
@@ -514,6 +508,32 @@ void Cond::emit(Gen &g) const
 
 	delete[] else_end;
 	delete[] lbl_else;
+}
+
+// cdecl calling convention
+void Call::emit(Gen &g) const
+{
+	// push params from right to left
+	if (params.size())
+	{
+		for (int i = params.size() - 1; i >= 0; --i)
+		{
+			params[i]->emit(g);
+			g.emit("push %rax");
+		}
+	}
+
+	// call
+	g.emit("call ", false);
+	g.emit_append((*func.vars)[func.entry].name.c_str(), true);
+
+	// restore stack
+	if (params.size())
+	{
+		g.emit("add $", false);
+		g.emit_int(params.size() * 4);
+		g.emit_append(", %rsp", true);
+	}
 }
 
 void Const::emit(Gen &g) const
@@ -569,11 +589,19 @@ void Gen::comment(const char *str)
 	out << "# " << str << '\n';
 };
 
+void Gen::emit_offset(int offset)
+{
+	if (offset == 0) 
+		out << "(%rbp)";
+	else
+		out << offset << "(%rbp)";
+}
+
+void Gen::nl() { out << '\n'; }
+
 void Gen::func_epilogue()
 {
-	out << "\n\tmov %rbp, %rsp\n"
-		<< "\tpop %rbp\n"
-		<< "\tret\n";
+	out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 
 const char *Gen::get_label()

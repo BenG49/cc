@@ -19,7 +19,8 @@ static bool is_assign(TokType t)
 // binop | assign
 Expr *Parser::expr()
 {
-	if (is_assign(l.peek(2).type))
+	TokType two_ahead = l.peek(2).type;
+	if (is_assign(two_ahead))
 	 	return assign();
 	else
 		return cond();
@@ -94,10 +95,12 @@ Node *Parser::stmt()
 	return out;
 }
 
-// params = [ ( type IDENTIFIER ) | ( type IDENTIFIER ',' params ) ]
-// type IDENTIFIER '(' params ')' '{' { stmt | decl } '}'
+// params = [ type IDENTIFIER [ ',' params ] ]
+// type IDENTIFIER '(' params ')' ( '{' { stmt | decl } '}' | ';' )
 Stmt *Parser::func()
 {
+	bool prev_declared = false;
+
 	Func *out = new Func;
 	scope = new Scope(scope, scope->stack_index);
 
@@ -108,32 +111,64 @@ Stmt *Parser::func()
 
 	// eat type
 	l.eat(t);
+
+	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
+
+	prev_declared = scope->in_scope(name);
 		
 	// get func name, add to sym tab
-	scope->vec.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val)));
+	scope->vec.push_back(Symbol(t, name, out, 0));
 
 	out->name = Var(scope->vec.size() - 1, scope);
 
 	l.eat((TokType)'(');
 
-	while (l.pnxt().type != ')')
-	{
-		tok = l.pnxt();
-		t = tok.type;
+	// 8 for func ptr, 8 for rbp, -8 for the offset += 8
+	int offset = 8;
 
-		if (!is_type(t) && t != KEY_VOID)
+	tok = l.pnxt();
+	t = tok.type;
+	while (t && t != ')')
+	{
+		if (!is_type(t))
 			parse_err("Expected function param type", tok);
 		
 		l.eat(t);
 
 		// get param name
-		out->params.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val)));
+		scope->vec.push_back(Symbol(t, std::get<std::string>(l.eat(IDENTIFIER).val), out, (offset += 8)));
+		out->params.push_back(Var(scope->vec.size() - 1, scope));
 
 		if (l.pnxt().type != ')')
 			l.eat((TokType)',');
+
+		tok = l.pnxt();
+		t = tok.type;
+	}
+
+	if (!t)
+		parse_err("Unclosed parentheses in function definition", tok);
+	
+	if (prev_declared)
+	{
+		for (Symbol &s : scope->vec)
+			// if a symbol is found with the same name
+			// if the symbol is a function
+			// if the function has different num of params than this function
+			if (s.name == name && s.node->type == FUNC && ((Func*)s.node)->params.size() != out->params.size())
+			{
+				parse_err("Function parameter count does not match with previous declaration", tok);
+			}
 	}
 
 	l.eat((TokType)')');
+
+	if (l.pnxt().type == ';')
+	{
+		l.eat((TokType)';');
+		out->blk = nullptr;
+		return out;
+	}
 
 	// scope is reset in compound
 	out->blk = compound();
@@ -151,18 +186,12 @@ Decl *Parser::decl()
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
-	for (Symbol &s : scope->vec)
-	{
-		if (s.name == name)
-			parse_err("Redefinition of variable " + name, tok);
-	}
+	if (scope->in_scope(name))
+		parse_err("Redefinition of variable " + name, tok);
 
-	scope->vec.push_back(Symbol(t, name));
+	Decl *out = new Decl(Var(scope->vec.size(), scope));
 
-	// only 32 bit int for now
-	scope->vec.back().bp_offset = (scope->stack_index += 4);
-
-	Decl *out = new Decl(Var(scope->vec.size() - 1, scope));
+	scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4)));
 
 	if (l.pnxt().type == '=')
 	{
@@ -454,7 +483,7 @@ Expr *Parser::postfix()
 		return p;
 }
 
-// INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
+// call | INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
 Expr *Parser::primary()
 {
 	Token tok = l.pnxt();
@@ -467,8 +496,13 @@ Expr *Parser::primary()
 	}
 	else if (t == IDENTIFIER)
 	{
-		auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-		return new Var(p.first, p.second);
+		if (l.peek(2).type == '(')
+			return call();
+		else
+		{
+			auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
+			return new Var(p.first, p.second);
+		}
 	}
 	else if (t == '(')
 	{
@@ -481,6 +515,41 @@ Expr *Parser::primary()
 
 	parse_err(std::string("Invalid expression ") + l.getname(t), tok);
 	return nullptr;
+}
+
+// IDENTIFIER '(' [ expr { ',' expr } ] ')'
+Expr *Parser::call()
+{
+	Call *out = new Call;
+
+	// get function from scope
+	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
+	out->func = Var(p.first, p.second);
+
+	l.eat((TokType)'(');
+
+	Token tok = l.pnxt();
+	TokType t = tok.type;
+	while (t && t != ')')
+	{
+		out->params.push_back(expr());
+
+		if (l.pnxt().type != ')')
+			l.eat((TokType)',');
+		
+		tok = l.pnxt();
+		t = tok.type;
+	}
+
+	if (!t)
+		parse_err("Unclosed parentheses in function call", tok);
+	
+	if (out->params.size() != ((Func*)p.second->vec[p.first].node)->params.size())
+		parse_err("Too many arguments to function call", tok);
+
+	l.eat((TokType)')');
+
+	return out;
 }
 
 // -------- main program blk -------- //
