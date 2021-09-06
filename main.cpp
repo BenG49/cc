@@ -43,15 +43,15 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 			break;
 
 		case FUNC:
-			printf("FUNC TYPE(%s)", Lexer::getname(s.vec[((Func*)ast)->name.entry].type));
-			printf(" NAME(%s)", s.vec[((Func*)ast)->name.entry].name.c_str());
+			printf("FUNC TYPE SIZE(%d)", ((Func*)ast)->name.get().size);
+			printf(" NAME(%s)", ((Func*)ast)->name.get().name.c_str());
 			puts(" PARAMS:");
 			
 			for (unsigned i = 0; i < ((Func*)ast)->params.size(); ++i)
 			{
 				Var s = ((Func*)ast)->params.at(i);
 				ptabs(tabs + 1);
-				printf("%d %s\n", s.type, (*s.vars)[s.entry].name.c_str());
+				printf("%d %s\n", s.type, s.get().name.c_str());
 			}
 
 			prettyprint(((Func*)ast)->blk, tabs + 1, s);
@@ -89,14 +89,14 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 			break;
 		
 		case DECL:
-			printf("DECL TYPE(%s) NAME(%s)\n",
-				Lexer::getname(s.vec[((Decl*)ast)->v.entry].type),
-				s.vec[((Decl*)ast)->v.entry].name.c_str());
+			printf("DECL TYPE SIZE(%d) NAME(%s)\n",
+				((Decl*)ast)->v.get().size,
+				((Decl*)ast)->v.get().name.c_str());
 			
 			break;
 		
 		case VAR:
-			printf("VAR NAME(%s)\n", s.vec[((Var*)ast)->entry].name.c_str());
+			printf("VAR NAME(%s)\n", ((Var*)ast)->get().name.c_str());
 			break;
 		
 		case COND:

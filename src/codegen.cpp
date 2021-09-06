@@ -9,14 +9,14 @@ void Var::emit(Gen &g) const
 void Compound::emit(Gen &g) const
 {
 	if (scope->parent_scope)
-		g.rbp(-(scope->vec.size() << 2));
+		g.rbp(-scope->size);
 
 	for (Node *s : vec)
 		s->emit(g);
 	
 	// dont dealloc if function: just pop rbp
 	if (!func && scope->parent_scope)
-		g.rbp(scope->vec.size() << 2);
+		g.rbp(scope->size);
 }
 
 void If::emit(Gen &g) const
@@ -100,7 +100,7 @@ void ForDecl::emit(Gen &g) const
 	g.cont_lbl = post_lbl;
 
 	// decl statement has its own scope, alloc var
-	g.rbp(-(for_scope->vec.size() << 2));
+	g.rbp(-for_scope->size);
 
 	init->emit(g);
 
@@ -121,7 +121,7 @@ void ForDecl::emit(Gen &g) const
 	g.label(end);
 	
 	// decl statement has its own scope, dealloc var
-	g.rbp(for_scope->vec.size() << 2);
+	g.rbp(for_scope->size);
 
 	delete[] start;
 	delete[] end;
@@ -184,9 +184,9 @@ void Func::emit(Gen &g) const
 		return;
 
 	g.append("\n.globl ");
-	g.append((*name.vars)[name.entry].name.c_str(), true);
+	g.append(name.get().name.c_str(), true);
 
-	g.label((*name.vars)[name.entry].name.c_str());
+	g.label(name.get().name.c_str());
 
 	// prologue
 	g.emit("push %rbp");
@@ -463,6 +463,8 @@ void Cond::emit(Gen &g) const
 // sysv calling convention
 void Call::emit(Gen &g) const
 {
+	Symbol &f = func.get();
+
 	if (params.size())
 	{
 		// first 6 params go into registers
@@ -488,7 +490,7 @@ void Call::emit(Gen &g) const
 
 	// call
 	g.emit("call ", false);
-	g.append((*func.vars)[func.entry].name.c_str(), true);
+	g.append(f.name.c_str(), true);
 
 	for (int i = std::min(5, (int)params.size() - 1); i >= 0; --i)
 	{
@@ -501,7 +503,7 @@ void Call::emit(Gen &g) const
 	if (params.size() > 6)
 	{
 		g.emit("add $", false);
-		g.emit_int((params.size() - 6) * 4);
+		g.emit_int(((Func*)f.node)->blk->scope->size);
 		g.append(", %rsp", true);
 	}
 }
@@ -514,6 +516,11 @@ void Const::emit(Gen &g) const
 			g.emit("mov $", false);
 			g.emit_int(std::get<long long>(t.val));
 			g.append(", %eax", true);
+			break;
+		case CHAR_CONSTANT:
+			g.emit("mov $", false);
+			g.emit_int((char)std::get<long long>(t.val));
+			g.append(", %al", true);
 			break;
 		case KEY_BREAK:
 			g.jmp("jmp", g.break_lbl);
@@ -537,7 +544,7 @@ void Gen::x86_codegen(Compound *ast)
 		if (s.node->type == DECL)
 		{
 			Decl *d = (Decl*)s.node;
-			const std::string &name = (*d->v.vars)[d->v.entry].name;
+			const std::string &name = d->v.get().name;
 
 			// initialized block
 			if (d->expr)
@@ -563,9 +570,9 @@ void Gen::x86_codegen(Compound *ast)
 				bool pass = false;
 
 				// if forward declared, don't emit
-				for (const Symbol &s : ast->scope->vec)
+				for (const Symbol &s_ : ast->scope->vec)
 				{
-					if (s.name == name && ((Decl*)s.node)->expr)
+					if (s_.name == name && ((Decl*)s_.node)->expr)
 					{
 						pass = true;
 						break;
@@ -578,7 +585,7 @@ void Gen::x86_codegen(Compound *ast)
 				append(".comm ");
 				append(name.c_str());
 				append(", ");
-				emit_int(4);
+				emit_int(s.size);
 				nl();
 			}
 		}
@@ -613,6 +620,8 @@ void Gen::comment(const char *str)
 {
 	out << "# " << str << '\n';
 };
+
+void Gen::emitc(char c) { out << c; }
 
 void Gen::rbp(int offset)
 {
@@ -654,3 +663,12 @@ const char *Gen::SYSV_REG_LIST[] = {
 	"%r8",
 	"%r9"
 };
+
+const char *Gen::AX_SIZE[] = {
+	"%al",
+	"%ax",
+	"%eax"
+	"%rax",
+};
+
+const char Gen::MOV_SIZE[] = { 'b', 'w', 'l', 'q' };

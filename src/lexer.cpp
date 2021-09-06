@@ -20,6 +20,7 @@ const char *NAMES[TOK_COUNT - IDENTIFIER] = {
 	"identifier",
 	"integer constant",
 	"floating constant",
+	"character constant",
 	"string constant",
 };
 
@@ -137,6 +138,31 @@ Token Lexer::next()
 				blockcomment();
 				continue;
 			}
+		}
+
+		if (cur == '\'')
+		{
+			bool esc = false;
+			char out = buf[index + 1];
+
+			if (out == '\\')
+			{
+				esc = true;
+				out = esc_code(buf[index + 2]);
+
+				if (buf[index + 3] != '\'')
+					lex_err("Unterminated character constant");
+			}
+			else if (out == '\'')
+				lex_err("Character constant should contain at least one character");
+			else if (buf[index + 2] != '\'')
+				lex_err("Unterminated character constant");
+
+			Token tok(CHAR_CONSTANT, line, col, esc ? 2 : 1);
+			tok.val = static_cast<long long>(out);
+
+			count(esc ? 4 : 3);
+			return tok;
 		}
 
 		// check for numeric constant
@@ -497,4 +523,13 @@ const char *Lexer::getname(TokType t)
 		return KEYWORDS[t - 256];
 	else
 		return NAMES[t - IDENTIFIER];
+}
+
+int Lexer::getsize(TokType t)
+{
+	switch (t) {
+		case INT_CONSTANT: return 4;
+		case CHAR_CONSTANT: return 1;
+		default: return -1;
+	}
 }

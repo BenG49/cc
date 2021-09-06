@@ -8,7 +8,8 @@ struct Func;
 struct Node;
 
 struct Symbol {
-	TokType type;
+	// TODO: add fp flag later
+	int size;
 	std::string name;
 
 	bool reg;
@@ -16,8 +17,8 @@ struct Symbol {
 
 	Node *node;
 
-	Symbol(TokType t, const std::string &name, Node *node, int offset_or_reg, bool reg)
-		: type(t), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
+	Symbol(int size, const std::string &name, Node *node, int offset_or_reg, bool reg)
+		: size(size), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
 };
 
 // scope deallocates variables on stack after done, stack index is left the same
@@ -25,11 +26,14 @@ struct Scope {
 	Scope *parent_scope;
 
 	int stack_index;
+	int size;
 
 	std::vector<Symbol> vec;
 
 	Scope(Scope *parent_scope, int stack_index)
-		: parent_scope(parent_scope), stack_index(stack_index) {}
+		: parent_scope(parent_scope), stack_index(stack_index), size(0) {}
+	
+	void add_var(int var_size) { stack_index += var_size; size += var_size; }
 	
 	bool in_scope(const std::string &name) const
 	{

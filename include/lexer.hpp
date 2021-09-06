@@ -57,6 +57,7 @@ enum TokType
 	IDENTIFIER,
 	INT_CONSTANT,
 	FP_CONSTANT,
+	CHAR_CONSTANT,
 	STR_CONSTANT,
 	TOK_COUNT,
 };
@@ -108,4 +109,5 @@ public:
 	Token peek(unsigned lookahead);
 
 	static const char *getname(TokType t);
+	static int getsize(TokType t);
 };

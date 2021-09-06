@@ -17,14 +17,14 @@ static bool is_assign(TokType t)
 // this code is horrible
 void Var::mov(bool from_var, Gen &g) const
 {
-	int val = (*vars)[entry].offset_or_reg;
-	bool reg = (*vars)[entry].reg;
+	int val = get().offset_or_reg;
+	bool reg = get().reg;
 		
 	const char *tmp;
 
 	if (globl)
 	{
-		const std::string &name = (*vars)[entry].name;
+		const std::string &name = get().name;
 
 		g.emit("movl ", false);
 		tmp = new char[name.size() + 7];
@@ -250,14 +250,17 @@ Stmt *Parser::func()
 	return out;
 }
 
-// int IDENTIFIER [ '=' expr ] ';'
+// type IDENTIFIER [ '=' expr ] ';'
 Decl *Parser::decl()
 {
 	bool globl = scope->parent_scope == nullptr;
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
-	l.eat(KEY_INT);
+	if (is_type(t))
+		l.eat(t);
+	else
+		parse_err("Expected variable type preceding declaration", tok);
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
@@ -277,14 +280,18 @@ Decl *Parser::decl()
 	Decl *out = new Decl(Var(scope->vec.size(), scope, globl));
 
 	if (globl)
-		scope->vec.push_back(Symbol(t, name, out, 0, false));
+		scope->vec.push_back(Symbol(Lexer::getsize(t), name, out, 0, false));
 	else
-		scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4), false));
+	{
+		scope->add_var(Lexer::getsize(t));
+		scope->vec.push_back(Symbol(Lexer::getsize(t), name, out, scope->stack_index, false));
+	}
 
 	if (l.pnxt().type == '=')
 	{
 		l.eat((TokType)'=');
 		out->expr = expr();
+		std::cout << Lexer::getname(((Const*)out->expr)->t.type) << '\n';
 	}
 
 	l.eat((TokType)';');
@@ -571,13 +578,13 @@ Expr *Parser::postfix()
 		return p;
 }
 
-// call | INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | IDENTIFIER | '(' expr ')'
+// call | INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | CHAR_CONSTANT | IDENTIFIER | '(' expr ')'
 Expr *Parser::primary()
 {
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 
-	if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT)
+	if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT || t == CHAR_CONSTANT)
 	{
 		l.eat(t);
 		return new Const(tok);

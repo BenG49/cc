@@ -25,6 +25,7 @@ public:
 	void label(const char *lbl);
 	void jmp(const char *jmp, const char *lbl);
 	void comment(const char *str);
+	void emitc(char c);
 	void rbp(int offset);
 	void nl();
 
@@ -37,4 +38,6 @@ public:
 	const char *cont_lbl;
 
 	static const char *SYSV_REG_LIST[];
+	static const char *AX_SIZE[];
+	static const char MOV_SIZE[];
 };

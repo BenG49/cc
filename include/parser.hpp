@@ -49,6 +49,8 @@ struct Var : Expr {
 		, vars(&scope->vec)
 		, globl(globl) { type = VAR; }
 
+	// NOTE: should only be called after parsing is done and vec size will not change
+	Symbol &get() const { return (*vars)[entry]; }
 	void mov(bool from_var, Gen &g) const;
 	void emit(Gen &g) const override;
 };
