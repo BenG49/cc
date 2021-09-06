@@ -17,29 +17,26 @@ static bool is_assign(TokType t)
 // this code is horrible
 void Var::mov(bool from_var, Gen &g) const
 {
-	int val = get().offset_or_reg;
-	bool reg = get().reg;
+	Symbol &s = get();
+	Gen::Size size = s.size;
+	int val = s.offset_or_reg;
+	bool reg = s.reg;
 		
 	const char *tmp;
 
+	g.emit_mov(size);
+
 	if (globl)
 	{
-		const std::string &name = get().name;
+		const std::string &name = s.name;
 
-		g.emit("movl ", false);
 		tmp = new char[name.size() + 7];
 		sprintf((char*)tmp, "%s(%%rip)", name.c_str());
 	}
 	else if (reg)
-	{
-		g.emit("mov ", false);
-		tmp = Gen::SYSV_REG_LIST[val];
-	}
+		tmp = Gen::REGS[size][Gen::SYSV_REGS[val]];
 	else
 	{
-		// specify mov size for memory location
-		g.emit("movl ", false);
-
 		if (val == 0)
 			tmp = "(%rbp)";
 		else
@@ -59,7 +56,7 @@ void Var::mov(bool from_var, Gen &g) const
 	if (reg) 
 		g.append("%rax");
 	else
-		g.append("%eax");
+		g.emit_reg(Gen::Reg::A, size);
 
 	// ax -> get
 	if (!from_var)
@@ -280,18 +277,17 @@ Decl *Parser::decl()
 	Decl *out = new Decl(Var(scope->vec.size(), scope, globl));
 
 	if (globl)
-		scope->vec.push_back(Symbol(Lexer::getsize(t), name, out, 0, false));
+		scope->vec.push_back(Symbol(t, name, out, 0, false));
 	else
 	{
-		scope->add_var(Lexer::getsize(t));
-		scope->vec.push_back(Symbol(Lexer::getsize(t), name, out, scope->stack_index, false));
+		scope->add_var(t);
+		scope->vec.push_back(Symbol(t, name, out, scope->stack_index, false));
 	}
 
 	if (l.pnxt().type == '=')
 	{
 		l.eat((TokType)'=');
 		out->expr = expr();
-		std::cout << Lexer::getname(((Const*)out->expr)->t.type) << '\n';
 	}
 
 	l.eat((TokType)';');

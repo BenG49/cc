@@ -109,5 +109,4 @@ public:
 	Token peek(unsigned lookahead);
 
 	static const char *getname(TokType t);
-	static int getsize(TokType t);
 };

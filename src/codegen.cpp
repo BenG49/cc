@@ -1,6 +1,8 @@
 #include <codegen.hpp>
 #include <parser.hpp>
 
+#include <symtab.hpp>
+
 void Var::emit(Gen &g) const
 {
 	mov(true, g);
@@ -474,10 +476,12 @@ void Call::emit(Gen &g) const
 
 			// save prev reg - not very efficient, but works
 			g.emit("push ", false);
-			g.append(Gen::SYSV_REG_LIST[i], true);
+			g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+			g.nl();
 
 			g.emit("mov %rax, ", false);
-			g.append(Gen::SYSV_REG_LIST[i], true);
+			g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+			g.nl();
 		}
 
 		// rest are pushed from right to left
@@ -496,7 +500,8 @@ void Call::emit(Gen &g) const
 	{
 		// restore prev reg - not very efficient, but works
 		g.emit("pop ", false);
-		g.append(Gen::SYSV_REG_LIST[i], true);
+		g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+		g.nl();
 	}
 
 	// restore stack
@@ -602,13 +607,15 @@ void Gen::emit(const char *str, bool nl)
 	if (nl) out << '\n';
 }
 
+void Gen::emitc(char c) { out << c; }
+void Gen::emit_int(long long i) { out << i; }
+
 void Gen::append(const char *str, bool nl)
 {
 	out << str;
 	if (nl) out << '\n';
 }
 
-void Gen::emit_int(long long i) { out << i; }
 void Gen::label(const char *lbl) { out << lbl << ":\n"; }
 
 void Gen::jmp(const char *jmp, const char *lbl)
@@ -616,27 +623,40 @@ void Gen::jmp(const char *jmp, const char *lbl)
 	out << '\t' << jmp << ' ' << lbl << '\n';
 }
 
-void Gen::comment(const char *str)
+void Gen::emit_mov(Gen::Size size)
 {
-	out << "# " << str << '\n';
-};
-
-void Gen::emitc(char c) { out << c; }
+	switch (size) {
+		case Byte: out << "\tmovb "; break;
+		case Word: out << "\tmovw "; break;
+		case Long: out << "\tmovl "; break;
+		case Quad: out << "\tmovq "; break;
+	}
+}
 
 void Gen::rbp(int offset)
 {
-	if (offset > 0)
-		out << "\tsub $" << offset << ", %rsp\n";
-	else if (offset < 0)
+	if (offset < 0)
+		out << "\tsub $" << -offset << ", %rsp\n";
+	else if (offset > 0)
 		out << "\tadd $" << offset << ", %rsp\n";
 }
-
-void Gen::nl() { out << '\n'; }
 
 void Gen::func_epilogue()
 {
 	out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
+
+void Gen::emit_reg(Gen::Reg r, Gen::Size size)
+{
+	out << '%' << REGS[size][r];
+}
+
+void Gen::comment(const char *str)
+{
+	out << "# " << str << '\n';
+};
+
+void Gen::nl() { out << '\n'; }
 
 const char *Gen::get_label()
 {
@@ -655,20 +675,21 @@ const char *Gen::get_label()
 
 	return buf;
 }
-const char *Gen::SYSV_REG_LIST[] = {
-	"%rdi",
-	"%rsi",
-	"%rdx",
-	"%rcx",
-	"%r8",
-	"%r9"
-};
 
-const char *Gen::AX_SIZE[] = {
-	"%al",
-	"%ax",
-	"%eax"
-	"%rax",
-};
 
-const char Gen::MOV_SIZE[] = { 'b', 'w', 'l', 'q' };
+Gen::Size Gen::getsize(TokType t)
+{
+	switch (t) {
+		case INT_CONSTANT: return Gen::Size::Long;
+		case CHAR_CONSTANT: return Gen::Size::Byte;
+		default: return Gen::Size::Quad;
+	}
+}
+
+const Gen::Reg Gen::SYSV_REGS[] = { DI, SI, D, C, R8, R9 };
+const char *Gen::REGS[4][COUNT] = {
+	{ "al",  "bl",  "cl",  "dl",  "dil", "sil", "bpl", "spl", "r8l", "r9l", "r10l", "r11l", "r12l", "r13l", "r14l", "r15l", "ip" }, // 8
+	{ "ax",  "bx",  "cx",  "dx",  "di",  "si",  "bp",  "sp",  "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w", "ip" }, // 16
+	{ "eax", "ebx", "ecx", "edx", "edi", "esi", "ebp", "esp", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d", "eip" }, // 32
+	{ "rax", "rbx", "rcx", "rdx", "rdi", "rsi", "rbp", "rsp", "r8",  "r9",  "r10",  "r11",  "r12",  "r13",  "r14",  "r15",  "rip" }, // 64
+};

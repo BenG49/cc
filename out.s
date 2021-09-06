@@ -6,12 +6,21 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	sub $1, %rsp
-	movl %eax, -1(%rbp)
-	movl -1(%rbp), %eax
-	mov %rbp, %rsp
-	pop %rbp
-	ret
+	mov $72, %al
+	push %rdi
+	mov %rax, %rdi
+	call putchar
+	pop %rdi
+	mov $105, %al
+	push %rdi
+	mov %rax, %rdi
+	call putchar
+	pop %rdi
+	mov $10, %al
+	push %rdi
+	mov %rax, %rdi
+	call putchar
+	pop %rdi
 	xor %eax, %eax
 	mov %rbp, %rsp
 	pop %rbp

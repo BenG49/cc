@@ -1,4 +1,7 @@
+int putchar(char c);
+
 int main() {
-    char c = 'f';
-    return c;
+    putchar('H');
+    putchar('i');
+    putchar('\n');
 }

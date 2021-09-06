@@ -120,7 +120,7 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 int main(int argc, const char *argv[]) {
 	if (argc == 1)
 	{
-		std::cout << "Must specify input file!\n";
+		std::cerr << "Must specify input file!\n";
 		return 1;
 	}
 

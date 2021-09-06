@@ -8,6 +8,8 @@
 #include <string>
 #include <limits>
 
+#include <codegen.hpp>
+
 const int STR_TOK_LEN = IDENTIFIER - 256;
 
 const char *KEYWORDS[STR_TOK_LEN] = {
@@ -523,13 +525,4 @@ const char *Lexer::getname(TokType t)
 		return KEYWORDS[t - 256];
 	else
 		return NAMES[t - IDENTIFIER];
-}
-
-int Lexer::getsize(TokType t)
-{
-	switch (t) {
-		case INT_CONSTANT: return 4;
-		case CHAR_CONSTANT: return 1;
-		default: return -1;
-	}
 }

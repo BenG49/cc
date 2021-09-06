@@ -31,4 +31,6 @@
 *.out
 *.app
 
+# other
 .vscode/
+tests/a

@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include <codegen.hpp>
 #include <lexer.hpp>
 
 struct Func;
@@ -9,7 +10,7 @@ struct Node;
 
 struct Symbol {
 	// TODO: add fp flag later
-	int size;
+	Gen::Size size;
 	std::string name;
 
 	bool reg;
@@ -17,8 +18,10 @@ struct Symbol {
 
 	Node *node;
 
-	Symbol(int size, const std::string &name, Node *node, int offset_or_reg, bool reg)
+	Symbol(Gen::Size size, const std::string &name, Node *node, int offset_or_reg, bool reg)
 		: size(size), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
+	Symbol(TokType t, const std::string &name, Node *node, int offset_or_reg, bool reg)
+		: size(Gen::getsize(t)), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
 };
 
 // scope deallocates variables on stack after done, stack index is left the same
@@ -33,7 +36,13 @@ struct Scope {
 	Scope(Scope *parent_scope, int stack_index)
 		: parent_scope(parent_scope), stack_index(stack_index), size(0) {}
 	
-	void add_var(int var_size) { stack_index += var_size; size += var_size; }
+	void add_var(TokType type) {
+		Gen::Size s = Gen::getsize(type);
+		int var_size = 1 << (s - 1);
+
+		stack_index -= var_size;
+		size += var_size;
+	}
 	
 	bool in_scope(const std::string &name) const
 	{
