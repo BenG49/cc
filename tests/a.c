@@ -1,28 +1,51 @@
-
-// test sysv stack abi
-int lots_of_args(int a, int b, int c, int d, int e, int f, int stack1, int stack2)
+int sqrt(int n)
 {
-    return stack1 + stack2;
+    // init est
+    int x0 = n >> 1;
+
+    if (!x0)
+        return n;
+    
+    // update
+    int x1 = ( x0 + n / x0 ) >> 1;
+		
+    while ( x1 < x0 )
+    {
+        x0 = x1;
+        x1 = ( x0 + n / x0 ) >> 1;
+    }
+		
+    return x0;
 }
 
-int putchar(int c);
+int low_factor(int n)
+{
+    if (!(n & 1))
+        return 2;
+    
+    int s = sqrt(n);
+
+    for (int i = 3; i < s; ++i)
+        if (n % i == 0)
+            return i;
+    
+    return 1;
+}
+
+int gpf(int n)
+{
+    int f = low_factor(n);
+
+    if (f == 1)
+        return n;
+    
+    int a = gpf(f);
+    int b = gpf(n / f);
+
+    return (a > b) ? a : b;
+}
 
 int main()
 {
-    // yes
-    putchar(72);
-    putchar(101);
-    putchar(108);
-    putchar(108);
-    putchar(111);
-    putchar(32);
-    putchar(87);
-    putchar(111);
-    putchar(114);
-    putchar(108);
-    putchar(100);
-    putchar(33);
-    putchar(10);
-
-    return lots_of_args(1, 2, 3, 4, 5, 6, 7, 8);
+    return gpf(13195);
 }

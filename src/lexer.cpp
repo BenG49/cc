@@ -77,14 +77,19 @@ Token Lexer::eat(TokType expected)
 	Token next = pnxt();
 	if (next.type != expected)
 	{
-		std::stringstream out;
+		if (expected == ';')
+			lex_err("Expected a \';\'");
+		else
+		{
+			std::stringstream out;
 		
-		out << "Invalid token: expected "
-			<< getname(expected)
-			<< ", got "
-			<< getname(next.type);
+			out << "Invalid token: expected "
+				<< getname(expected)
+				<< ", got "
+				<< getname(next.type);
 
-		lex_err(out.str());
+			lex_err(out.str());
+		}
 	}
 
 	// remove cached value
@@ -458,7 +463,7 @@ void Lexer::blockcomment()
 
 void Lexer::lex_err(const std::string &msg)
 {
-	std::cerr << "Error: " << msg
+	std::cerr << msg
 			  << " at line " << line
 			  << ", col " << col
 			  << '\n';

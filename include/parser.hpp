@@ -41,11 +41,13 @@ struct Expr : Node {};
 struct Var : Expr {
 	int entry;
 	std::vector<Symbol> *vars;
+	bool globl;
 
 	Var() { type = VAR; }
-	Var(int entry, Scope *scope)
+	Var(int entry, Scope *scope, bool globl=false)
 		: entry(entry)
-		, vars(&scope->vec) { type = VAR; }
+		, vars(&scope->vec)
+		, globl(globl) { type = VAR; }
 
 	void mov(bool from_var, Gen &g) const;
 	void emit(Gen &g) const override;

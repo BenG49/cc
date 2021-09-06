@@ -23,7 +23,7 @@ void Var::emit(Gen &g) const
 
 void Compound::emit(Gen &g) const
 {
-	if (scope->vec.size())
+	if (scope->vec.size() && scope->parent_scope)
 	{
 		// allocate space on the stack
 		g.emit("sub $", false);
@@ -34,7 +34,7 @@ void Compound::emit(Gen &g) const
 	for (Node *s : vec)
 		s->emit(g);
 	
-	if (!func && scope->vec.size())
+	if (!func && scope->vec.size() && scope->parent_scope)
 	{
 		// dealloc vars for block
 		g.emit("add $", false);
@@ -255,7 +255,7 @@ void Ret::emit(Gen &g) const
 void Decl::emit(Gen &g) const
 {
 	// if the declaration also initialized
-	if (expr)
+	if (expr && !v.globl)
 	{
 		expr->emit(g);
 
@@ -568,7 +568,67 @@ void Const::emit(Gen &g) const
 
 // -------- gen -------- //
 
-void Gen::x86_codegen(Compound *ast) { ast->emit(*this); }
+void Gen::x86_codegen(Compound *ast)
+{
+	emit_append(".data", true);
+
+	// emit globals
+	for (const Symbol &s : ast->scope->vec)
+	{
+		if (s.node->type == DECL)
+		{
+			Decl *d = (Decl*)s.node;
+			const std::string &name = (*d->v.vars)[d->v.entry].name;
+
+			// initialized block
+			if (d->expr)
+			{
+				if (d->expr->type != CONST)
+				{
+					std::cerr << "Global variable must be initialized with constant\n";
+					exit(1);
+				}
+
+				emit_append(".globl ");
+				emit_append(name.c_str(), true);
+
+				emit_append(name.c_str());
+				emit_append(": ");
+				emit_append(".int ");
+				emit_int(std::get<long long>(((Const*)d->expr)->t.val));
+				nl();
+			}
+			// uninitialized block
+			else
+			{
+				bool pass = false;
+
+				// if forward declared, don't emit
+				for (const Symbol &s : ast->scope->vec)
+				{
+					if (s.name == name && ((Decl*)s.node)->expr)
+					{
+						pass = true;
+						break;
+					}
+				}
+
+				if (pass)
+					continue;
+
+				emit_append(".comm ");
+				emit_append(name.c_str());
+				emit_append(", ");
+				emit_int(4);
+				nl();
+			}
+		}
+	}
+
+	emit_append("\n.text", true);
+
+	ast->emit(*this);
+}
 
 void Gen::emit(const char *str, bool nl)
 {

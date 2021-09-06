@@ -22,7 +22,15 @@ void Var::mov(bool from_var, Gen &g) const
 		
 	const char *tmp;
 
-	if (reg)
+	if (globl)
+	{
+		const std::string &name = (*vars)[entry].name;
+
+		g.emit("movl ", false);
+		tmp = new char[name.size() + 7];
+		sprintf((char*)tmp, "%s(%%rip)", name.c_str());
+	}
+	else if (reg)
 	{
 		g.emit("mov ", false);
 		tmp = Gen::SYSV_REG_LIST[val];
@@ -37,7 +45,7 @@ void Var::mov(bool from_var, Gen &g) const
 		else
 		{
 			tmp = new char[std::to_string(val).size() + 7];
-			sprintf((char*)tmp, "%d%s", val, "(%rbp)");
+			sprintf((char*)tmp, "%d(%%rbp)", val);
 		}
 	}
 
@@ -62,7 +70,7 @@ void Var::mov(bool from_var, Gen &g) const
 		
 	g.nl();
 
-	if (!reg && val != 0)
+	if (globl || (!reg && val != 0))
 		delete[] tmp;
 }
 
@@ -216,9 +224,12 @@ Stmt *Parser::func()
 			// if a symbol is found with the same name
 			// if the symbol is a function
 			// if the function has different num of params than this function
-			if (s.name == name && s.node->type == FUNC && ((Func*)s.node)->params.size() != out->params.size())
+			if (s.name == name)
 			{
-				parse_err("Function parameter count does not match with previous declaration", tok);
+				if (s.node->type == FUNC && ((Func*)s.node)->params.size() != out->params.size())
+					parse_err("Function parameter count does not match with previous declaration", tok);
+				else if (s.node->type == DECL)
+					parse_err("Redefition of variable " + name, tok);
 			}
 	}
 
@@ -242,18 +253,33 @@ Stmt *Parser::func()
 // int IDENTIFIER [ '=' expr ] ';'
 Decl *Parser::decl()
 {
+	bool globl = scope->parent_scope == nullptr;
+
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	l.eat(KEY_INT);
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
+	// two calls to a looping search, not good
 	if (scope->in_scope(name))
+	{
+		if (globl)
+		{
+			auto p = scope->get(name);
+			if (p.second->vec[p.first].node->type == FUNC)
+				parse_err("Redefinition of function " + name, tok);
+		}
+
 		parse_err("Redefinition of variable " + name, tok);
+	}
 
-	Decl *out = new Decl(Var(scope->vec.size(), scope));
+	Decl *out = new Decl(Var(scope->vec.size(), scope, globl));
 
-	scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4), false));
+	if (globl)
+		scope->vec.push_back(Symbol(t, name, out, 0, false));
+	else
+		scope->vec.push_back(Symbol(t, name, out, (scope->stack_index -= 4), false));
 
 	if (l.pnxt().type == '=')
 	{
@@ -425,7 +451,7 @@ Compound *Parser::compound(bool newscope)
 Expr *Parser::lval()
 {
 	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	return new Var(p.first, p.second);
+	return new Var(p.first, p.second, ((Decl*)p.second->vec[p.first].node)->v.globl);
 }
 
 // lval assign expr
@@ -563,7 +589,7 @@ Expr *Parser::primary()
 		else
 		{
 			auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-			return new Var(p.first, p.second);
+			return new Var(p.first, p.second, ((Decl*)p.second->vec[p.first].node)->v.globl);
 		}
 	}
 	else if (t == '(')
@@ -606,6 +632,8 @@ Expr *Parser::call()
 	if (!t)
 		parse_err("Unclosed parentheses in function call", tok);
 	
+	if (p.second->vec[p.first].node->type != FUNC)
+		parse_err("Attempting to call variable", tok);
 	if (out->params.size() != ((Func*)p.second->vec[p.first].node)->params.size())
 		parse_err("Too many arguments to function call", tok);
 
@@ -616,20 +644,31 @@ Expr *Parser::call()
 
 // -------- main program blk -------- //
 
-// statementlist = function statementlist | function EOF
+// statementlist = { func | decl }
 Compound *Parser::parse()
 {
 	Compound *out = new Compound(scope);
 
+	TokType t = l.peek(3).type;
 	while (l.pnxt().type)
-		out->vec.push_back(func());
+	{
+		if (t)
+		{
+			if (t == '(')
+				out->vec.push_back(func());
+			else
+				out->vec.push_back(decl());
+		}
+
+		t = l.peek(3).type;
+	}
 	
 	return out;
 }
 
 void Parser::parse_err(const std::string &msg, const Token &err_tok)
 {
-	std::cerr << "Error: " << msg
+	std::cerr << msg
 			  << " at line " << err_tok.line
 			  << ", col " << err_tok.col
 			  << '\n';
