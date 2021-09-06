@@ -1,21 +1,6 @@
 #include <codegen.hpp>
 #include <parser.hpp>
 
-static const char *get_cmp_set(TokType t)
-{
-	switch (t) {
-		case OP_EQ: return "e";
-		case OP_NE: return "ne";
-		case OP_GE: return "ge";
-		case OP_LE: return "le";
-		case '<': return "l";
-		case '>': return "g";
-		default: return "";
-	}
-}
-
-// -------- code generation -------- //
-
 void Var::emit(Gen &g) const
 {
 	mov(true, g);
@@ -23,24 +8,15 @@ void Var::emit(Gen &g) const
 
 void Compound::emit(Gen &g) const
 {
-	if (scope->vec.size() && scope->parent_scope)
-	{
-		// allocate space on the stack
-		g.emit("sub $", false);
-		g.emit_int(scope->vec.size() * 4);
-		g.emit_append(", %rsp", true);
-	}
+	if (scope->parent_scope)
+		g.rbp(-(scope->vec.size() << 2));
 
 	for (Node *s : vec)
 		s->emit(g);
 	
-	if (!func && scope->vec.size() && scope->parent_scope)
-	{
-		// dealloc vars for block
-		g.emit("add $", false);
-		g.emit_int(scope->vec.size() * 4);
-		g.emit_append(", %rsp", true);
-	}
+	// dont dealloc if function: just pop rbp
+	if (!func && scope->parent_scope)
+		g.rbp(scope->vec.size() << 2);
 }
 
 void If::emit(Gen &g) const
@@ -116,7 +92,6 @@ void For::emit(Gen &g) const
 
 void ForDecl::emit(Gen &g) const
 {
-
 	const char *start = g.get_label();
 	const char *post_lbl = g.get_label();
 	const char *end = g.get_label();
@@ -125,13 +100,7 @@ void ForDecl::emit(Gen &g) const
 	g.cont_lbl = post_lbl;
 
 	// decl statement has its own scope, alloc var
-	if (for_scope->vec.size())
-	{
-		// allocate space on the stack
-		g.emit("sub $", false);
-		g.emit_int(for_scope->vec.size() * 4);
-		g.emit_append(", %rsp", true);
-	}
+	g.rbp(-(for_scope->vec.size() << 2));
 
 	init->emit(g);
 
@@ -152,17 +121,8 @@ void ForDecl::emit(Gen &g) const
 	g.label(end);
 	
 	// decl statement has its own scope, dealloc var
-	if (for_scope->vec.size())
-	{
-		// dealloc vars for block
-		g.emit("add $", false);
-		g.emit_int(for_scope->vec.size() * 4);
-		g.emit_append(", %rsp", true);
-	}
+	g.rbp(for_scope->vec.size() << 2);
 
-	g.break_lbl = nullptr;
-	g.cont_lbl = nullptr;
-	
 	delete[] start;
 	delete[] end;
 }
@@ -187,9 +147,6 @@ void While::emit(Gen &g) const
 	g.jmp("jmp", start);
 
 	g.label(end);
-
-	g.break_lbl = nullptr;
-	g.cont_lbl = nullptr;
 
 	delete[] start;
 	delete[] end;
@@ -216,9 +173,6 @@ void Do::emit(Gen &g) const
 
 	g.label(end);
 
-	g.break_lbl = nullptr;
-	g.cont_lbl = nullptr;
-
 	delete[] start;
 	delete[] end;
 }
@@ -229,8 +183,8 @@ void Func::emit(Gen &g) const
 	if (!blk)
 		return;
 
-	g.emit_append("\n.globl ");
-	g.emit_append((*name.vars)[name.entry].name.c_str(), true);
+	g.append("\n.globl ");
+	g.append((*name.vars)[name.entry].name.c_str(), true);
 
 	g.label((*name.vars)[name.entry].name.c_str());
 
@@ -258,9 +212,6 @@ void Decl::emit(Gen &g) const
 	if (expr && !v.globl)
 	{
 		expr->emit(g);
-
-		// move value into (ebp + offset)
-		// note that this should always be on the stack instead of reg
 		v.mov(false, g);
 	}
 }
@@ -279,9 +230,7 @@ void BinOp::emit(Gen &g) const
 
 		g.emit("test %eax, %eax");
 		g.jmp("jz", eval_rhs);
-		// g.emit("mov $1, %eax");
-		g.emit("xor %eax, %eax");
-		g.emit("inc %eax");
+		g.emit("mov $1, %eax");
 		g.jmp("jmp", end);
 
 		// eval rhs label
@@ -369,8 +318,18 @@ void BinOp::emit(Gen &g) const
 				g.emit("mov $0, %eax");
 
 				g.emit("set", false);
-				g.emit_append(get_cmp_set(op));
-				g.emit_append(" %al", true);
+
+				switch (op) {
+					case OP_EQ: g.append("e"); break;
+					case OP_NE: g.append("ne"); break;
+					case OP_GE: g.append("ge"); break;
+					case OP_LE: g.append("le"); break;
+					case '<': g.append("l"); break;
+					case '>': g.append("g"); break;
+					default: break;
+				}
+
+				g.append(" %al", true);
 			}
 	};
 }
@@ -513,10 +472,10 @@ void Call::emit(Gen &g) const
 
 			// save prev reg - not very efficient, but works
 			g.emit("push ", false);
-			g.emit_append(Gen::SYSV_REG_LIST[i], true);
+			g.append(Gen::SYSV_REG_LIST[i], true);
 
 			g.emit("mov %rax, ", false);
-			g.emit_append(Gen::SYSV_REG_LIST[i], true);
+			g.append(Gen::SYSV_REG_LIST[i], true);
 		}
 
 		// rest are pushed from right to left
@@ -529,13 +488,13 @@ void Call::emit(Gen &g) const
 
 	// call
 	g.emit("call ", false);
-	g.emit_append((*func.vars)[func.entry].name.c_str(), true);
+	g.append((*func.vars)[func.entry].name.c_str(), true);
 
 	for (int i = std::min(5, (int)params.size() - 1); i >= 0; --i)
 	{
 		// restore prev reg - not very efficient, but works
 		g.emit("pop ", false);
-		g.emit_append(Gen::SYSV_REG_LIST[i], true);
+		g.append(Gen::SYSV_REG_LIST[i], true);
 	}
 
 	// restore stack
@@ -543,7 +502,7 @@ void Call::emit(Gen &g) const
 	{
 		g.emit("add $", false);
 		g.emit_int((params.size() - 6) * 4);
-		g.emit_append(", %rsp", true);
+		g.append(", %rsp", true);
 	}
 }
 
@@ -554,7 +513,7 @@ void Const::emit(Gen &g) const
 		case INT_CONSTANT:
 			g.emit("mov $", false);
 			g.emit_int(std::get<long long>(t.val));
-			g.emit_append(", %eax", true);
+			g.append(", %eax", true);
 			break;
 		case KEY_BREAK:
 			g.jmp("jmp", g.break_lbl);
@@ -570,7 +529,7 @@ void Const::emit(Gen &g) const
 
 void Gen::x86_codegen(Compound *ast)
 {
-	emit_append(".data", true);
+	append(".data", true);
 
 	// emit globals
 	for (const Symbol &s : ast->scope->vec)
@@ -589,12 +548,12 @@ void Gen::x86_codegen(Compound *ast)
 					exit(1);
 				}
 
-				emit_append(".globl ");
-				emit_append(name.c_str(), true);
+				append(".globl ");
+				append(name.c_str(), true);
 
-				emit_append(name.c_str());
-				emit_append(": ");
-				emit_append(".int ");
+				append(name.c_str());
+				append(": ");
+				append(".int ");
 				emit_int(std::get<long long>(((Const*)d->expr)->t.val));
 				nl();
 			}
@@ -616,16 +575,16 @@ void Gen::x86_codegen(Compound *ast)
 				if (pass)
 					continue;
 
-				emit_append(".comm ");
-				emit_append(name.c_str());
-				emit_append(", ");
+				append(".comm ");
+				append(name.c_str());
+				append(", ");
 				emit_int(4);
 				nl();
 			}
 		}
 	}
 
-	emit_append("\n.text", true);
+	append("\n.text", true);
 
 	ast->emit(*this);
 }
@@ -636,30 +595,32 @@ void Gen::emit(const char *str, bool nl)
 	if (nl) out << '\n';
 }
 
-void Gen::emit_append(const char *str, bool nl)
+void Gen::append(const char *str, bool nl)
 {
 	out << str;
 	if (nl) out << '\n';
 }
 
 void Gen::emit_int(long long i) { out << i; }
-void Gen::emit_fp(double f) { out << f; }
-
-void Gen::label(const char *lbl)
-{
-	out << lbl << ":\n";
-}
+void Gen::label(const char *lbl) { out << lbl << ":\n"; }
 
 void Gen::jmp(const char *jmp, const char *lbl)
 {
 	out << '\t' << jmp << ' ' << lbl << '\n';
 }
 
-
 void Gen::comment(const char *str)
 {
 	out << "# " << str << '\n';
 };
+
+void Gen::rbp(int offset)
+{
+	if (offset > 0)
+		out << "\tsub $" << offset << ", %rsp\n";
+	else if (offset < 0)
+		out << "\tadd $" << offset << ", %rsp\n";
+}
 
 void Gen::nl() { out << '\n'; }
 
@@ -685,7 +646,6 @@ const char *Gen::get_label()
 
 	return buf;
 }
-
 const char *Gen::SYSV_REG_LIST[] = {
 	"%rdi",
 	"%rsi",

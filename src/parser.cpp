@@ -52,20 +52,20 @@ void Var::mov(bool from_var, Gen &g) const
 	// get -> ax
 	if (from_var)
 	{
-		g.emit_append(tmp);
-		g.emit_append(", ");
+		g.append(tmp);
+		g.append(", ");
 	}
 
 	if (reg) 
-		g.emit_append("%rax");
+		g.append("%rax");
 	else
-		g.emit_append("%eax");
+		g.append("%eax");
 
 	// ax -> get
 	if (!from_var)
 	{
-		g.emit_append(", ");
-		g.emit_append(tmp);
+		g.append(", ");
+		g.append(tmp);
 	}
 		
 	g.nl();

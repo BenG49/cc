@@ -68,7 +68,8 @@ struct If : Stmt {
 	If() { type = IF; }
 	If(Expr *cond, Node *if_blk)
 		: cond(cond)
-		, if_blk(if_blk) { type = IF; }
+		, if_blk(if_blk)
+		, else_blk(nullptr) { type = IF; }
 	If(Expr *cond, Node *if_blk, Node *else_blk)
 		: cond(cond)
 		, if_blk(if_blk)

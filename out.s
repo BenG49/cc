@@ -6,7 +6,7 @@
 sqrt:
 	push %rbp
 	mov %rsp, %rbp
-	sub $12, %rsp
+	add $-12, %rsp
 	mov $1, %eax
 	push %rax
 	mov %rdi, %rax
@@ -81,7 +81,7 @@ sus2:
 low_factor:
 	push %rbp
 	mov %rsp, %rbp
-	sub $8, %rsp
+	add $-8, %rsp
 	mov $1, %eax
 	push %rax
 	mov %rdi, %rax
@@ -103,7 +103,7 @@ sus3:
 	call sqrt
 	pop %rdi
 	movl %eax, -4(%rbp)
-	sub $4, %rsp
+	add $-4, %rsp
 	mov $3, %eax
 	movl %eax, -8(%rbp)
 sus4:
@@ -142,7 +142,7 @@ sus5:
 	movl %eax, -8(%rbp)
 	jmp sus4
 sus6:
-	add $4, %rsp
+	sub $4, %rsp
 	mov $1, %eax
 	mov %rbp, %rsp
 	pop %rbp
@@ -156,7 +156,7 @@ sus6:
 gpf:
 	push %rbp
 	mov %rsp, %rbp
-	sub $16, %rsp
+	add $-16, %rsp
 	mov %rdi, %rax
 	push %rdi
 	mov %rax, %rdi

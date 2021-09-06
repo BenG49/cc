@@ -20,12 +20,12 @@ public:
 	void x86_codegen(Compound *ast);
 
 	void emit(const char *str, bool nl=true);
-	void emit_append(const char *str, bool nl=false);
+	void append(const char *str, bool nl=false);
 	void emit_int(long long i);
-	void emit_fp(double f);
 	void label(const char *lbl);
 	void jmp(const char *jmp, const char *lbl);
 	void comment(const char *str);
+	void rbp(int offset);
 	void nl();
 
 	void func_epilogue();
