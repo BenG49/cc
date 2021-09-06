@@ -14,7 +14,6 @@ static bool is_assign(TokType t)
 		|| t == OP_OR_SET || t == OP_SHR_SET || t == OP_SHL_SET;
 }
 
-// this code is horrible
 void Var::mov(bool from_var, Gen &g) const
 {
 	Symbol &s = get();
@@ -26,14 +25,7 @@ void Var::mov(bool from_var, Gen &g) const
 
 	g.emit_mov(size);
 
-	if (globl)
-	{
-		const std::string &name = s.name;
-
-		tmp = new char[name.size() + 7];
-		sprintf((char*)tmp, "%s(%%rip)", name.c_str());
-	}
-	else if (reg)
+	if (reg)
 		tmp = Gen::REGS[size][Gen::SYSV_REGS[val]];
 	else
 	{
@@ -67,8 +59,45 @@ void Var::mov(bool from_var, Gen &g) const
 		
 	g.nl();
 
-	if (globl || (!reg && val != 0))
+	if (!reg && val != 0)
 		delete[] tmp;
+}
+
+void Globl::mov(bool from_var, Gen &g) const
+{
+	Symbol &s = get();
+	Gen::Size size = s.size;
+	bool reg = s.reg;
+		
+	g.emit_mov(size);
+
+	const std::string &name = s.name;
+
+	const char *tmp = new char[name.size() + 7];
+	sprintf((char*)tmp, "%s(%%rip)", name.c_str());
+
+	// get -> ax
+	if (from_var)
+	{
+		g.append(tmp);
+		g.append(", ");
+	}
+
+	if (reg) 
+		g.append("%rax");
+	else
+		g.emit_reg(Gen::Reg::A, size);
+
+	// ax -> get
+	if (!from_var)
+	{
+		g.append(", ");
+		g.append(tmp);
+	}
+		
+	g.nl();
+
+	delete[] tmp;
 }
 
 // -------- grammars -------- //
@@ -261,7 +290,7 @@ Decl *Parser::decl()
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
-	// two calls to a looping search, not good
+	// two calls to a linear search, not good
 	if (scope->in_scope(name))
 	{
 		if (globl)
@@ -274,7 +303,12 @@ Decl *Parser::decl()
 		parse_err("Redefinition of variable " + name, tok);
 	}
 
-	Decl *out = new Decl(Var(scope->vec.size(), scope, globl));
+	Decl *out = new Decl;
+
+	if (globl)
+		out->v = new Globl(scope->vec.size(), scope);
+	else
+		out->v = new Var(scope->vec.size(), scope);
 
 	if (globl)
 		scope->vec.push_back(Symbol(t, name, out, 0, false));
@@ -454,7 +488,11 @@ Compound *Parser::compound(bool newscope)
 Expr *Parser::lval()
 {
 	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	return new Var(p.first, p.second, ((Decl*)p.second->vec[p.first].node)->v.globl);
+
+	if (((Decl*)p.second->vec[p.first].node)->v->type == GLOBL)
+		return new Globl(p.first, p.second);
+	else
+		return new Var(p.first, p.second);
 }
 
 // lval assign expr
@@ -592,7 +630,10 @@ Expr *Parser::primary()
 		else
 		{
 			auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-			return new Var(p.first, p.second, ((Decl*)p.second->vec[p.first].node)->v.globl);
+			if (((Decl*)p.second->vec[p.first].node)->v->type == GLOBL)
+				return new Globl(p.first, p.second);
+			else
+				return new Var(p.first, p.second);
 		}
 	}
 	else if (t == '(')

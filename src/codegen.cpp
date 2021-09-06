@@ -8,6 +8,11 @@ void Var::emit(Gen &g) const
 	mov(true, g);
 }
 
+void Globl::emit(Gen &g) const
+{
+	mov(true, g);
+}
+
 void Compound::emit(Gen &g) const
 {
 	if (scope->parent_scope)
@@ -211,10 +216,10 @@ void Ret::emit(Gen &g) const
 void Decl::emit(Gen &g) const
 {
 	// if the declaration also initialized
-	if (expr && !v.globl)
+	if (expr && v->type == VAR)
 	{
 		expr->emit(g);
-		v.mov(false, g);
+		((Var*)v)->mov(false, g);
 	}
 }
 
@@ -431,8 +436,10 @@ void Assign::emit(Gen &g) const
 	}
 
 	// move eax into (ebp - offset)
-	((Var*)lval)->mov(false, g);
-	return;
+	if (lval->type == GLOBL)
+		((Globl*)lval)->mov(false, g);
+	else
+		((Var*)lval)->mov(false, g);
 }
 
 void Cond::emit(Gen &g) const
@@ -546,10 +553,11 @@ void Gen::x86_codegen(Compound *ast)
 	// emit globals
 	for (const Symbol &s : ast->scope->vec)
 	{
-		if (s.node->type == DECL)
+		if (s.node->type == DECL && ((Decl*)s.node)->v->type == GLOBL)
 		{
 			Decl *d = (Decl*)s.node;
-			const std::string &name = d->v.get().name;
+
+			const std::string &name = ((Globl*)d->v)->get().name;
 
 			// initialized block
 			if (d->expr)

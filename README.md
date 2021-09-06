@@ -11,7 +11,7 @@ TODO:
 	- honestly almost never used
 - move function redefinition + param count error checking out of parser
 - missing features
-	- char, void, float
+	- void, float
 	- arrays
 	- pointers
 - add separate datatype for global variables

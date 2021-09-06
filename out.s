@@ -1,4 +1,8 @@
 .data
+.globl foo
+foo: .int 1
+.globl a
+a: .int 20
 
 .text
 
@@ -6,21 +10,12 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	mov $72, %al
-	push %rdi
-	mov %rax, %rdi
-	call putchar
-	pop %rdi
-	mov $105, %al
-	push %rdi
-	mov %rax, %rdi
-	call putchar
-	pop %rdi
-	mov $10, %al
-	push %rdi
-	mov %rax, %rdi
-	call putchar
-	pop %rdi
+	mov $10, %eax
+	movq %rax, foo(%rip)
+	movq foo(%rip), %rax
+	mov %rbp, %rsp
+	pop %rbp
+	ret
 	xor %eax, %eax
 	mov %rbp, %rsp
 	pop %rbp
