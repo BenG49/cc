@@ -3,12 +3,26 @@
 
 #include <symtab.hpp>
 
-void Var::emit(Gen &g) const
+Size getsize(TokType t)
 {
-	mov(true, g);
+	switch (t) {
+		case KEY_INT: return Size::Long;
+		case KEY_CHAR: return Size::Byte;
+		default: return Size::Quad;
+	}
 }
 
-void Globl::emit(Gen &g) const
+const Reg SYSV_REGS[] = { DI, SI, D, C, R8, R9 };
+const char *REGS[4][COUNT] = {
+	{ "al",  "bl",  "cl",  "dl",  "dil", "sil", "bpl", "spl", "r8l", "r9l", "r10l", "r11l", "r12l", "r13l", "r14l", "r15l", "ip" }, // 8
+	{ "ax",  "bx",  "cx",  "dx",  "di",  "si",  "bp",  "sp",  "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w", "ip" }, // 16
+	{ "eax", "ebx", "ecx", "edx", "edi", "esi", "ebp", "esp", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d", "eip" }, // 32
+	{ "rax", "rbx", "rcx", "rdx", "rdi", "rsi", "rbp", "rsp", "r8",  "r9",  "r10",  "r11",  "r12",  "r13",  "r14",  "r15",  "rip" }, // 64
+};
+
+// -------- code gen -------- //
+
+void Var::emit(Gen &g) const
 {
 	mov(true, g);
 }
@@ -216,10 +230,10 @@ void Ret::emit(Gen &g) const
 void Decl::emit(Gen &g) const
 {
 	// if the declaration also initialized
-	if (expr && v->type == VAR)
+	if (expr && !v.get().global)
 	{
 		expr->emit(g);
-		((Var*)v)->mov(false, g);
+		v.mov(false, g);
 	}
 }
 
@@ -435,11 +449,8 @@ void Assign::emit(Gen &g) const
 
 	}
 
-	// move eax into (ebp - offset)
-	if (lval->type == GLOBL)
-		((Globl*)lval)->mov(false, g);
-	else
-		((Var*)lval)->mov(false, g);
+	// mov eax into var
+	((Var*)lval)->mov(false, g);
 }
 
 void Cond::emit(Gen &g) const
@@ -483,11 +494,11 @@ void Call::emit(Gen &g) const
 
 			// save prev reg - not very efficient, but works
 			g.emit("push ", false);
-			g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+			g.emit_reg(SYSV_REGS[i], Size::Quad);
 			g.nl();
 
 			g.emit("mov %rax, ", false);
-			g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+			g.emit_reg(SYSV_REGS[i], Size::Quad);
 			g.nl();
 		}
 
@@ -507,7 +518,7 @@ void Call::emit(Gen &g) const
 	{
 		// restore prev reg - not very efficient, but works
 		g.emit("pop ", false);
-		g.emit_reg(Gen::SYSV_REGS[i], Gen::Size::Quad);
+		g.emit_reg(SYSV_REGS[i], Size::Quad);
 		g.nl();
 	}
 
@@ -553,11 +564,11 @@ void Gen::x86_codegen(Compound *ast)
 	// emit globals
 	for (const Symbol &s : ast->scope->vec)
 	{
-		if (s.node->type == DECL && ((Decl*)s.node)->v->type == GLOBL)
+		if (s.node->type == DECL && s.global)
 		{
 			Decl *d = (Decl*)s.node;
 
-			const std::string &name = ((Globl*)d->v)->get().name;
+			const std::string &name = d->v.get().name;
 
 			// initialized block
 			if (d->expr)
@@ -598,7 +609,7 @@ void Gen::x86_codegen(Compound *ast)
 				append(".comm ");
 				append(name.c_str());
 				append(", ");
-				emit_int(s.size);
+				emit_int(1 << s.size);
 				nl();
 			}
 		}
@@ -631,7 +642,7 @@ void Gen::jmp(const char *jmp, const char *lbl)
 	out << '\t' << jmp << ' ' << lbl << '\n';
 }
 
-void Gen::emit_mov(Gen::Size size)
+void Gen::emit_mov(Size size)
 {
 	switch (size) {
 		case Byte: out << "\tmovb "; break;
@@ -654,7 +665,7 @@ void Gen::func_epilogue()
 	out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 
-void Gen::emit_reg(Gen::Reg r, Gen::Size size)
+void Gen::emit_reg(Reg r, Size size)
 {
 	out << '%' << REGS[size][r];
 }
@@ -683,21 +694,3 @@ const char *Gen::get_label()
 
 	return buf;
 }
-
-
-Gen::Size Gen::getsize(TokType t)
-{
-	switch (t) {
-		case INT_CONSTANT: return Gen::Size::Long;
-		case CHAR_CONSTANT: return Gen::Size::Byte;
-		default: return Gen::Size::Quad;
-	}
-}
-
-const Gen::Reg Gen::SYSV_REGS[] = { DI, SI, D, C, R8, R9 };
-const char *Gen::REGS[4][COUNT] = {
-	{ "al",  "bl",  "cl",  "dl",  "dil", "sil", "bpl", "spl", "r8l", "r9l", "r10l", "r11l", "r12l", "r13l", "r14l", "r15l", "ip" }, // 8
-	{ "ax",  "bx",  "cx",  "dx",  "di",  "si",  "bp",  "sp",  "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w", "ip" }, // 16
-	{ "eax", "ebx", "ecx", "edx", "edi", "esi", "ebp", "esp", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d", "eip" }, // 32
-	{ "rax", "rbx", "rcx", "rdx", "rdi", "rsi", "rbp", "rsp", "r8",  "r9",  "r10",  "r11",  "r12",  "r13",  "r14",  "r15",  "rip" }, // 64
-};

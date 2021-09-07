@@ -9,19 +9,42 @@ struct Func;
 struct Node;
 
 struct Symbol {
-	// TODO: add fp flag later
-	Gen::Size size;
+	Size size;
 	std::string name;
-
 	bool reg;
-	int offset_or_reg;
+	bool global;
+	int reg_or_bp_offset;
 
 	Node *node;
 
-	Symbol(Gen::Size size, const std::string &name, Node *node, int offset_or_reg, bool reg)
-		: size(size), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
-	Symbol(TokType t, const std::string &name, Node *node, int offset_or_reg, bool reg)
-		: size(Gen::getsize(t)), name(name), reg(reg), offset_or_reg(offset_or_reg), node(node) {}
+	Symbol(Size size, const std::string &name, Node *node)
+		: size(size), name(name), reg(false), global(true), node(node) {}
+	Symbol(Size size, const std::string &name, Node *node, int bp_offset)
+		: size(size), name(name), reg(false), global(false), reg_or_bp_offset(bp_offset), node(node) {}
+	Symbol(Size size, const std::string &name, Reg r, Node *node)
+		: size(size), name(name), reg(true), global(false), reg_or_bp_offset(r), node(node) {}
+
+	void emit(Gen &g)
+	{
+		if (global)
+		{
+			g.append(name.c_str(), false);
+			g.emitc('(');
+			g.emit_reg(IP, Quad);
+			g.emitc(')');
+		}
+		else if (reg)
+			g.emit_reg(static_cast<Reg>(reg_or_bp_offset), size);
+		else
+		{
+			if (reg_or_bp_offset)
+				g.emit_int(reg_or_bp_offset);
+			
+			g.emitc('(');
+			g.emit_reg(BP, Quad);
+			g.emitc(')');
+		}
+	}
 };
 
 // scope deallocates variables on stack after done, stack index is left the same
@@ -37,8 +60,8 @@ struct Scope {
 		: parent_scope(parent_scope), stack_index(stack_index), size(0) {}
 	
 	void add_var(TokType type) {
-		Gen::Size s = Gen::getsize(type);
-		int var_size = 1 << (s - 1);
+		Size s = getsize(type);
+		int var_size = 1 << s;
 
 		stack_index -= var_size;
 		size += var_size;

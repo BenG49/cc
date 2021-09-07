@@ -89,16 +89,9 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 			break;
 		
 		case DECL:
-			if (((Decl*)ast)->v->type == GLOBL)
-			{
-				printf("DECL TYPE SIZE(%d) NAME(%s)\n",
-					((Globl*)((Decl*)ast)->v)->get().size,
-					((Globl*)((Decl*)ast)->v)->get().name.c_str());
-			}
-			else
-				printf("DECL TYPE SIZE(%d) NAME(%s)\n",
-					((Var*)((Decl*)ast)->v)->get().size,
-					((Var*)((Decl*)ast)->v)->get().name.c_str());
+			printf("DECL TYPE SIZE(%d) NAME(%s)\n",
+				((Decl*)ast)->v.get().size,
+				((Decl*)ast)->v.get().name.c_str());
 			
 			break;
 		

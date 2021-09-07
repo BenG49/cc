@@ -1,8 +1,4 @@
 .data
-.globl foo
-foo: .int 1
-.globl a
-a: .int 20
 
 .text
 
@@ -10,9 +6,14 @@ a: .int 20
 main:
 	push %rbp
 	mov %rsp, %rbp
-	mov $10, %eax
-	movq %rax, foo(%rip)
-	movq foo(%rip), %rax
+	sub $1, %rsp
+	mov $48, %al
+	movb %al, -1(%rbp)
+	mov $1, %eax
+	push %rax
+	movb -1(%rbp), %al
+	pop %rcx
+	add %ecx, %eax
 	mov %rbp, %rsp
 	pop %rbp
 	ret

@@ -17,87 +17,27 @@ static bool is_assign(TokType t)
 void Var::mov(bool from_var, Gen &g) const
 {
 	Symbol &s = get();
-	Gen::Size size = s.size;
-	int val = s.offset_or_reg;
-	bool reg = s.reg;
-		
-	const char *tmp;
 
-	g.emit_mov(size);
+	g.emit_mov(s.size);
 
-	if (reg)
-		tmp = Gen::REGS[size][Gen::SYSV_REGS[val]];
-	else
-	{
-		if (val == 0)
-			tmp = "(%rbp)";
-		else
-		{
-			tmp = new char[std::to_string(val).size() + 7];
-			sprintf((char*)tmp, "%d(%%rbp)", val);
-		}
-	}
-
-	// get -> ax
+	// var -> ax
 	if (from_var)
 	{
-		g.append(tmp);
+		s.emit(g);
 		g.append(", ");
 	}
 
-	if (reg) 
-		g.append("%rax");
-	else
-		g.emit_reg(Gen::Reg::A, size);
+	// registers are always 64 bit if stored
+	g.emit_reg(A, (s.reg ? Quad : s.size));
 
-	// ax -> get
+	// ax -> var
 	if (!from_var)
 	{
 		g.append(", ");
-		g.append(tmp);
+		s.emit(g);
 	}
 		
 	g.nl();
-
-	if (!reg && val != 0)
-		delete[] tmp;
-}
-
-void Globl::mov(bool from_var, Gen &g) const
-{
-	Symbol &s = get();
-	Gen::Size size = s.size;
-	bool reg = s.reg;
-		
-	g.emit_mov(size);
-
-	const std::string &name = s.name;
-
-	const char *tmp = new char[name.size() + 7];
-	sprintf((char*)tmp, "%s(%%rip)", name.c_str());
-
-	// get -> ax
-	if (from_var)
-	{
-		g.append(tmp);
-		g.append(", ");
-	}
-
-	if (reg) 
-		g.append("%rax");
-	else
-		g.emit_reg(Gen::Reg::A, size);
-
-	// ax -> get
-	if (!from_var)
-	{
-		g.append(", ");
-		g.append(tmp);
-	}
-		
-	g.nl();
-
-	delete[] tmp;
 }
 
 // -------- grammars -------- //
@@ -204,7 +144,7 @@ Stmt *Parser::func()
 	prev_declared = globl->in_scope(name);
 		
 	// get func name, add to sym tab
-	globl->vec.push_back(Symbol(t, name, out, 0, false));
+	globl->vec.push_back(Symbol(getsize(t), name, out, 0));
 
 	out->name = Var(globl->vec.size() - 1, globl);
 
@@ -224,13 +164,13 @@ Stmt *Parser::func()
 
 		// get param name
 		if (out->params.size() < 6)
-			scope->vec.push_back(Symbol(
-				t, std::get<std::string>(l.eat(IDENTIFIER).val),
-				out, out->params.size(), true));
+			scope->vec.push_back(Symbol(Quad,
+				std::get<std::string>(l.eat(IDENTIFIER).val),
+				SYSV_REGS[out->params.size()], out));
 		else
-			scope->vec.push_back(Symbol(
-				t, std::get<std::string>(l.eat(IDENTIFIER).val),
-				out, (offset += 8), false));
+			scope->vec.push_back(Symbol(getsize(t),
+				std::get<std::string>(l.eat(IDENTIFIER).val),
+				out, offset += 8));
 
 		out->params.push_back(Var(scope->vec.size() - 1, scope));
 
@@ -290,6 +230,14 @@ Decl *Parser::decl()
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
+	Decl *out = new Decl(Var(scope->vec.size(), scope));
+
+	if (l.pnxt().type == '=')
+	{
+		l.eat((TokType)'=');
+		out->expr = expr();
+	}
+
 	// two calls to a linear search, not good
 	if (scope->in_scope(name))
 	{
@@ -298,30 +246,19 @@ Decl *Parser::decl()
 			auto p = scope->get(name);
 			if (p.second->vec[p.first].node->type == FUNC)
 				parse_err("Redefinition of function " + name, tok);
+			else if (out->expr && p.second->vec[p.first].node->type == DECL && ((Decl*)p.second->vec[p.first].node)->expr)
+				parse_err("Redefinition of variable " + name, tok);
 		}
-
-		parse_err("Redefinition of variable " + name, tok);
+		else
+			parse_err("Redefinition of variable " + name, tok);
 	}
 
-	Decl *out = new Decl;
-
 	if (globl)
-		out->v = new Globl(scope->vec.size(), scope);
-	else
-		out->v = new Var(scope->vec.size(), scope);
-
-	if (globl)
-		scope->vec.push_back(Symbol(t, name, out, 0, false));
+		scope->vec.push_back(Symbol(getsize(t), name, out));
 	else
 	{
 		scope->add_var(t);
-		scope->vec.push_back(Symbol(t, name, out, scope->stack_index, false));
-	}
-
-	if (l.pnxt().type == '=')
-	{
-		l.eat((TokType)'=');
-		out->expr = expr();
+		scope->vec.push_back(Symbol(getsize(t), name, out, scope->stack_index));
 	}
 
 	l.eat((TokType)';');
@@ -488,11 +425,7 @@ Compound *Parser::compound(bool newscope)
 Expr *Parser::lval()
 {
 	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-
-	if (((Decl*)p.second->vec[p.first].node)->v->type == GLOBL)
-		return new Globl(p.first, p.second);
-	else
-		return new Var(p.first, p.second);
+	return new Var(p.first, p.second);
 }
 
 // lval assign expr
@@ -577,17 +510,17 @@ BINEXP(term, factor, t == '+' || t == '-')
 // unop { ( '/' | '*' | '%' ) unop }
 BINEXP(factor, unop, t == '/' || t == '*' || t == '%')
 
-// postfix | ( OP_INC | OP_DEC ) lval | ( '!' | '~' | '-' ) unop
+// postfix | ( OP_INC | OP_DEC | '&' ) lval | ( '!' | '~' | '-' ) unop
 Expr *Parser::unop()
 {
 	TokType t = l.pnxt().type;
-	if (t == OP_INC || t == OP_DEC)
+	if (t == OP_INC || t == OP_DEC || t == '&')
 	{
 		l.eat(t);
 
 		return new UnOp(t, lval());
 	}
-	else if (t == '!' || t == '~' || t == '-')
+	else if (t == '!' || t == '~' || t == '-' || t == '*')
 	{
 		l.eat(t);
 
@@ -630,10 +563,7 @@ Expr *Parser::primary()
 		else
 		{
 			auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-			if (((Decl*)p.second->vec[p.first].node)->v->type == GLOBL)
-				return new Globl(p.first, p.second);
-			else
-				return new Var(p.first, p.second);
+			return new Var(p.first, p.second);
 		}
 	}
 	else if (t == '(')

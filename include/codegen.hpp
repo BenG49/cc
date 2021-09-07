@@ -5,6 +5,16 @@
 
 #include <lexer.hpp>
 
+enum Reg { A, B, C, D, DI, SI, BP, SP, R8, R9, R10, R11, R12, R13, R14, R15, IP, COUNT };
+enum Size { Byte, Word, Long, Quad };
+
+Size getsize(TokType t);
+
+extern const Reg SYSV_REGS[];
+extern const char *REGS[4][COUNT];
+
+
+
 struct Compound;
 
 class Gen
@@ -16,9 +26,6 @@ public:
 	Gen(const std::string &outfile)
 		: out(outfile)
 		, lbl_count(0) {}
-
-	enum Reg { A, B, C, D, DI, SI, BP, SP, R8, R9, R10, R11, R12, R13, R14, R15, IP, COUNT };
-	enum Size { Byte, Word, Long, Quad };
 
 	void x86_codegen(Compound *ast);
 
@@ -42,10 +49,4 @@ public:
 	// kinda bad but whatever
 	const char *break_lbl;
 	const char *cont_lbl;
-
-
-	static Size getsize(TokType t);
-
-	static const Reg SYSV_REGS[];
-	static const char *REGS[4][COUNT];
 };

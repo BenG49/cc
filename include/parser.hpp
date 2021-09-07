@@ -26,7 +26,6 @@ enum NodeType
 	COND,
 	CONST,
 	VAR,
-	GLOBL,
 	BREAK,
 	CONT,
 	CALL,
@@ -50,21 +49,7 @@ struct Var : Expr {
 
 	// NOTE: should only be called after parsing is done and vec size will not change
 	Symbol &get() const { return (*vars)[entry]; }
-	void mov(bool from_var, Gen &g) const;
-	void emit(Gen &g) const override;
-};
 
-struct Globl : Expr {
-	int entry;
-	std::vector<Symbol> *vars;
-
-	Globl() { type = GLOBL; }
-	Globl(int entry, Scope *scope)
-		: entry(entry)
-		, vars(&scope->vec) { type = GLOBL; }
-
-	// NOTE: should only be called after parsing is done and vec size will not change
-	Symbol &get() const { return (*vars)[entry]; }
 	void mov(bool from_var, Gen &g) const;
 	void emit(Gen &g) const override;
 };
@@ -141,14 +126,12 @@ struct Ret : Stmt {
 };
 
 struct Decl : Stmt {
-	Expr *v, *expr;
+	Var v;
+	Expr *expr;
 	Decl() { type = DECL; }
-	Decl(Expr *v)
+	Decl(Var v)
 		: v(v)
 		, expr(nullptr) { type = DECL; }
-	Decl(Expr *v, Expr *expr)
-		: v(v)
-		, expr(expr) { type = DECL; }
 	void emit(Gen &g) const override;
 };
 

@@ -14,7 +14,8 @@ TODO:
 	- void, float
 	- arrays
 	- pointers
-- add separate datatype for global variables
+- assign all evaluatable nodes (binop, unop, const) size
+	- maybe after parsing
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
