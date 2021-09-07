@@ -7,8 +7,7 @@
 #include <symtab.hpp>
 #include <lexer.hpp>
 
-enum NodeType
-{
+enum NodeType {
 	NONE,
 	BLOCK,
 	IF,

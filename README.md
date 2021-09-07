@@ -25,6 +25,13 @@ The least optimized compiler you'll ever see.
 	- void, float
 	- arrays
 	- pointers
+		- pointer type
+		- take pointer to (&)
+			- for now don't support taking pointer to func args, but later on mark variable as having been moved to stack and move
+			- lea -4(%rbp)
+			- lea foo(%rip)
+		- dereference (*)
+			- load ptr into register, use register as mem addr
 - add separate datatype for global variables
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
