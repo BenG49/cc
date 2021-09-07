@@ -23,8 +23,6 @@ The least optimized compiler you'll ever see.
 - move function redefinition + param count error checking out of parser
 - missing features
 	- void, float
-<<<<<<< HEAD
-=======
 	- pointers (arrays, strings)
 		- pointer type
 		- take pointer to (&)
@@ -33,7 +31,6 @@ The least optimized compiler you'll ever see.
 			- lea foo(%rip)
 		- dereference (\*)
 			- load ptr into register, use register as mem addr
->>>>>>> a792d45e410997cf104173e37b19346e4d673fa9
 - assign all evaluatable nodes (binop, unop, const) size
 	- maybe after parsing
 
