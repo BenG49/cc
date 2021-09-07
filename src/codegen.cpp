@@ -357,7 +357,16 @@ void BinOp::emit(Gen &g) const
 
 void UnOp::emit(Gen &g) const
 {
+	if (op == '&')
+		g.emit("leaq ", false);
+
 	operand->emit(g);
+
+	if (op == '&')
+	{
+		g.emit_reg(A, Quad);
+		return;
+	}
 
 	switch (op) {
 		case '-': g.emit("neg %eax"); break;

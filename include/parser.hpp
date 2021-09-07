@@ -28,6 +28,7 @@ enum NodeType {
 	BREAK,
 	CONT,
 	CALL,
+	PTR,
 };
 
 struct Node {

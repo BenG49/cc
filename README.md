@@ -24,6 +24,7 @@ The least optimized compiler you'll ever see.
 - missing features
 	- void, float
 	- pointers (arrays, strings)
+		- https://en.cppreference.com/w/c/language/pointer
 		- pointer type
 		- take pointer to (&)
 			- for now don't support taking pointer to func args, but later on mark variable as having been moved to stack and move

@@ -216,17 +216,20 @@ Stmt *Parser::func()
 	return out;
 }
 
-// type IDENTIFIER [ '=' expr ] ';'
+// type { '*' } IDENTIFIER [ '=' expr ] ';'
 Decl *Parser::decl()
 {
 	bool globl = scope->parent_scope == nullptr;
+	int ptr_depth = 0;
 
 	Token tok = l.pnxt();
-	TokType t = tok.type;
-	if (is_type(t))
-		l.eat(t);
+	TokType type = tok.type;
+	if (is_type(type))
+		l.eat(type);
 	else
 		parse_err("Expected variable type preceding declaration", tok);
+	
+	
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
@@ -254,11 +257,11 @@ Decl *Parser::decl()
 	}
 
 	if (globl)
-		scope->vec.push_back(Symbol(getsize(t), name, out));
+		scope->vec.push_back(Symbol(getsize(type), name, out));
 	else
 	{
-		scope->add_var(t);
-		scope->vec.push_back(Symbol(getsize(t), name, out, scope->stack_index));
+		scope->add_var(type);
+		scope->vec.push_back(Symbol(getsize(type), name, out, scope->stack_index));
 	}
 
 	l.eat((TokType)';');
@@ -510,17 +513,17 @@ BINEXP(term, factor, t == '+' || t == '-')
 // unop { ( '/' | '*' | '%' ) unop }
 BINEXP(factor, unop, t == '/' || t == '*' || t == '%')
 
-// postfix | ( OP_INC | OP_DEC | '&' ) lval | ( '!' | '~' | '-' ) unop
+// postfix | ( OP_INC | OP_DEC | '&' | '* ) lval | ( '!' | '~' | '-' ) unop
 Expr *Parser::unop()
 {
 	TokType t = l.pnxt().type;
-	if (t == OP_INC || t == OP_DEC || t == '&')
+	if (t == OP_INC || t == OP_DEC || t == '&' || t == '*')
 	{
 		l.eat(t);
 
 		return new UnOp(t, lval());
 	}
-	else if (t == '!' || t == '~' || t == '-' || t == '*')
+	else if (t == '!' || t == '~' || t == '-')
 	{
 		l.eat(t);
 

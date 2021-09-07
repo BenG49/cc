@@ -10,20 +10,23 @@ struct Node;
 
 struct Symbol {
 	Size size;
-	std::string name;
-	bool reg;
-	bool global;
-	int reg_or_bp_offset;
+	int val;
 
+	std::string name;
 	Node *node;
 
-	Symbol(Size size, const std::string &name, Node *node)
-		: size(size), name(name), reg(false), global(true), node(node) {}
-	Symbol(Size size, const std::string &name, Node *node, int bp_offset)
-		: size(size), name(name), reg(false), global(false), reg_or_bp_offset(bp_offset), node(node) {}
-	Symbol(Size size, const std::string &name, Reg r, Node *node)
-		: size(size), name(name), reg(true), global(false), reg_or_bp_offset(r), node(node) {}
+	bool reg;
+	bool global;
+	bool pointer;
 
+	Symbol(Size size, const std::string &name, Node *node)
+		: size(size), name(name), node(node), reg(false), global(true) {}
+	Symbol(Size size, const std::string &name, Node *node, int bp_offset)
+		: size(size), val(bp_offset), name(name), node(node), reg(false), global(false) {}
+	Symbol(Size size, const std::string &name, Reg r, Node *node)
+		: size(size), val(r), name(name), node(node), reg(true), global(false) {}
+
+	
 	void emit(Gen &g)
 	{
 		if (global)
@@ -34,11 +37,11 @@ struct Symbol {
 			g.emitc(')');
 		}
 		else if (reg)
-			g.emit_reg(static_cast<Reg>(reg_or_bp_offset), size);
+			g.emit_reg(static_cast<Reg>(val), size);
 		else
 		{
-			if (reg_or_bp_offset)
-				g.emit_int(reg_or_bp_offset);
+			if (val)
+				g.emit_int(val);
 			
 			g.emitc('(');
 			g.emit_reg(BP, Quad);
