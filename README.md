@@ -17,22 +17,20 @@ The least optimized compiler you'll ever see.
 - add good error messages
 - add octal char, hex char, unicode code point escape codes in lexer
 - add power of two optimization for mul, div, mod
-- support lvalues not just being identifiers
+- support lvalues not just being identifiers (pointers)
 - add comma operator (have to make it lower precedence than =)
 	- honestly almost never used
 - move function redefinition + param count error checking out of parser
 - missing features
 	- void, float
-	- arrays
-	- pointers
+	- pointers (arrays, strings)
 		- pointer type
 		- take pointer to (&)
 			- for now don't support taking pointer to func args, but later on mark variable as having been moved to stack and move
 			- lea -4(%rbp)
 			- lea foo(%rip)
-		- dereference (*)
+		- dereference (\*)
 			- load ptr into register, use register as mem addr
-- add separate datatype for global variables
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
