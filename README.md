@@ -2,7 +2,18 @@
 
 The least optimized compiler you'll ever see.
 
-TODO:
+## Currently implemented features
+- functions and function calls (Sysv ABI)
+- variables and global variables
+- forward declarations (functions and global variables)
+- loops
+	- break, continue
+- conditionals
+- binary operations
+- unary operations (++, --, !, ~, -)
+- postfix operations (++, --)
+
+## TODO:
 - add good error messages
 - add octal char, hex char, unicode code point escape codes in lexer
 - add power of two optimization for mul, div, mod
