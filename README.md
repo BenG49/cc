@@ -2,18 +2,38 @@
 
 The least optimized compiler you'll ever see.
 
-TODO:
+## Currently implemented features
+- functions and function calls (Sysv ABI)
+- variables and global variables
+- forward declarations (functions and global variables)
+- loops
+	- break, continue
+- conditionals
+- binary operations
+- unary operations (++, --, !, ~, -)
+- postfix operations (++, --)
+
+## TODO:
 - add good error messages
 - add octal char, hex char, unicode code point escape codes in lexer
 - add power of two optimization for mul, div, mod
-- support lvalues not just being identifiers
+- support lvalues not just being identifiers (pointers)
 - add comma operator (have to make it lower precedence than =)
 	- honestly almost never used
 - move function redefinition + param count error checking out of parser
 - missing features
 	- void, float
-	- arrays
-	- pointers
+<<<<<<< HEAD
+=======
+	- pointers (arrays, strings)
+		- pointer type
+		- take pointer to (&)
+			- for now don't support taking pointer to func args, but later on mark variable as having been moved to stack and move
+			- lea -4(%rbp)
+			- lea foo(%rip)
+		- dereference (\*)
+			- load ptr into register, use register as mem addr
+>>>>>>> a792d45e410997cf104173e37b19346e4d673fa9
 - assign all evaluatable nodes (binop, unop, const) size
 	- maybe after parsing
 
