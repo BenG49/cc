@@ -34,6 +34,7 @@ The least optimized compiler you'll ever see.
 			- load ptr into register, use register as mem addr
 - assign all evaluatable nodes (binop, unop, const) size
 	- maybe after parsing
+	- add implicit cast warnings, keep track of pointer depth (char **arr)
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
