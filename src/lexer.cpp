@@ -311,7 +311,7 @@ Token Lexer::next()
 			if (keyword(KEYWORDS[i]))
 			{
 				int len = std::strlen(KEYWORDS[i]);
-				Token out((TokType)(i + 256), line, col, len);
+				Token out(static_cast<TokType>(i + 256), line, col, len);
 				count(len);
 				return out;
 			}
@@ -322,7 +322,7 @@ Token Lexer::next()
 		while (*ptr)
 			if (cur == *ptr++)
 			{
-				Token out((TokType)cur, line, col, 1);
+				Token out(static_cast<TokType>(cur), line, col, 1);
 				count(1);
 				return out;
 			}

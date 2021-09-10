@@ -1,7 +1,5 @@
 #include <parser.hpp>
 
-#include <symtab.hpp>
-
 static bool is_type(TokType t)
 {
 	return t == KEY_BOOL || t == KEY_CHAR || t == KEY_INT || t == KEY_FLOAT || t == KEY_VOID;
@@ -14,36 +12,10 @@ static bool is_assign(TokType t)
 		|| t == OP_OR_SET || t == OP_SHR_SET || t == OP_SHL_SET;
 }
 
-void Var::mov(bool from_var, Gen &g) const
-{
-	Symbol &s = get();
-
-	g.emit_mov(s.size);
-
-	// var -> ax
-	if (from_var)
-	{
-		s.emit(g);
-		g.append(", ");
-	}
-
-	// registers are always 64 bit if stored
-	g.emit_reg(A, (s.reg ? Quad : s.size));
-
-	// ax -> var
-	if (!from_var)
-	{
-		g.append(", ");
-		s.emit(g);
-	}
-		
-	g.nl();
-}
-
 // -------- grammars -------- //
 
 // binop | assign
-Expr *Parser::expr()
+AST *Parser::expr()
 {
 	TokType two_ahead = l.peek(2).type;
 	if (is_assign(two_ahead))
@@ -53,28 +25,24 @@ Expr *Parser::expr()
 }
 
 // [ expr ]
-Expr *Parser::exp_option()
+AST *Parser::exp_option()
 {
 	if (l.pnxt().type == ';' || l.pnxt().type == ')')
-	{
-		Expr *tmp = new Expr;
-		tmp->type = NONE;
-		return tmp;
-	}
+		return new AST(NONE);
 	else
 		return expr();
 }
 
 // 'return' expr ';' | if  | compound | exp_option ';' | KEY_BREAK ';' | KEY_CONT ';' | for | while | do
-Node *Parser::stmt()
+AST *Parser::stmt()
 {
-	Node *out = nullptr;
+	AST *out;
 	bool semi = true;
 
 	switch (l.pnxt().type) {
 		case KEY_RETURN:
 			l.eat(KEY_RETURN);
-			out = new Ret(expr());
+			out = new AST(RET, expr());
 			break;
 		case KEY_IF:
 			out = if_stmt();
@@ -95,12 +63,14 @@ Node *Parser::stmt()
 		case KEY_BREAK:
 			if (!in_loop)
 				parse_err("Break cannot appear outside of loop body", l.pnxt());
-			out = new Const(l.eat(KEY_BREAK));
+			l.eat(KEY_BREAK);
+			out = new AST(BREAK);
 			break;
 		case KEY_CONT:
 			if (!in_loop)
 				parse_err("Continue cannot appear outside of loop body", l.pnxt());
-			out = new Const(l.eat(KEY_CONT));
+			l.eat(KEY_CONT);
+			out = new AST(CONT);
 			break;
 		case '{':
 			out = compound();
@@ -116,42 +86,47 @@ Node *Parser::stmt()
 	}
 
 	if (semi)
-		l.eat((TokType)';');
+		l.eat(static_cast<TokType>(';'));
 
 	return out;
 }
 
 // params = [ type IDENTIFIER [ ',' params ] ]
 // type IDENTIFIER '(' params ')' ( '{' { stmt | decl } '}' | ';' )
-Stmt *Parser::func()
+// AST - lhs = symtab entry, mid = params, rhs = block
+AST *Parser::func()
 {
-	bool prev_declared = false;
-
-	Func *out = new Func;
-	Scope *globl = scope;
-	scope = new Scope(scope, scope->stack_index);
+	AST *out = new AST(FUNC);
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	if (!is_type(t))
 		parse_err("Expected function return type", tok);
 
-	// eat type
 	l.eat(t);
+
+	// symbol entry //
 
 	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
 
-	prev_declared = globl->in_scope(name);
-		
-	// get func name, add to sym tab
-	globl->vec.push_back(Symbol(getsize(t), name, out, 0));
+	Scope *globl = Scope::s(Scope::GLOBAL);
+	Scope *cur = Scope::s(cur_scope);
+	bool prev_declared = globl->in_scope(name);
 
-	out->name = Var(globl->vec.size() - 1, globl);
+	// add to sym tab
+	globl->syms.push_back(Sym(V_FUNC, t, name, 0));
 
-	l.eat((TokType)'(');
+	out->lhs = new AST(VAR, globl->syms.size() - 1, Scope::GLOBAL);
+
+	l.eat(static_cast<TokType>('('));
+	
+	// parameters //
 
 	// 8 for func ptr, 8 for rbp, -8 for the offset += 8
 	int offset = 8;
+	int param_count = 0;
+	cur_scope = Scope::new_scope(cur_scope);
+	AST *bottom = out->mid;
 
 	tok = l.pnxt();
 	t = tok.type;
@@ -163,19 +138,19 @@ Stmt *Parser::func()
 		l.eat(t);
 
 		// get param name
-		if (out->params.size() < 6)
-			scope->vec.push_back(Symbol(Quad,
+		if (param_count < 6)
+			cur->syms.push_back(Sym(V_REG, t,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
-				SYSV_REGS[out->params.size()], out));
+				ARG_START + param_count));
 		else
-			scope->vec.push_back(Symbol(getsize(t),
+			cur->syms.push_back(Sym(V_VAR, t,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
-				out, offset += 8));
+				offset += 8));
 
-		out->params.push_back(Var(scope->vec.size() - 1, scope));
+		bottom = AST::append(bottom, new AST(VAR, cur->syms.size() - 1, cur_scope), PARAM);
 
 		if (l.pnxt().type != ')')
-			l.eat((TokType)',');
+			l.eat(static_cast<TokType>(','));
 
 		tok = l.pnxt();
 		t = tok.type;
@@ -184,43 +159,44 @@ Stmt *Parser::func()
 	if (!t)
 		parse_err("Unclosed parentheses in function definition", tok);
 	
+	// set value to param count
+	globl->syms.back().val = param_count;
+	
 	if (prev_declared)
 	{
-		for (Symbol &s : globl->vec)
+		for (Sym &s : globl->syms)
 			// if a symbol is found with the same name
-			// if the symbol is a function
-			// if the function has different num of params than this function
 			if (s.name == name)
 			{
-				if (s.node->type == FUNC && ((Func*)s.node)->params.size() != out->params.size())
+				// if the symbol is a function
+				// if the function has different num of params than this function
+				if (s.vtype == V_FUNC && s.val != param_count)
 					parse_err("Function parameter count does not match with previous declaration", tok);
-				else if (s.node->type == DECL)
+				else if (s.vtype == V_GLOBL)
 					parse_err("Redefition of variable " + name, tok);
 			}
 	}
 
-	l.eat((TokType)')');
+	l.eat(static_cast<TokType>(')'));
 
 	if (l.pnxt().type == ';')
 	{
-		l.eat((TokType)';');
-		out->blk = nullptr;
-		scope = scope->parent_scope;
+		l.eat(static_cast<TokType>(';'));
+		cur_scope = cur->parent_id;
 		return out;
 	}
 
 	// scope is reset in compound
-	out->blk = compound(false);
-	out->blk->func = true;
+	offset = 0;
+	out->rhs = compound(false);
 
 	return out;
 }
 
-// type { '*' } IDENTIFIER [ '=' expr ] ';'
-Decl *Parser::decl()
+// type IDENTIFIER [ '=' expr ] ';'
+AST *Parser::decl()
 {
-	bool globl = scope->parent_scope == nullptr;
-	int ptr_depth = 0;
+	bool globl = cur_scope == 0;
 
 	Token tok = l.pnxt();
 	TokType type = tok.type;
@@ -228,184 +204,180 @@ Decl *Parser::decl()
 		l.eat(type);
 	else
 		parse_err("Expected variable type preceding declaration", tok);
-	
-	
 
-	std::string name = std::get<std::string>(l.eat(IDENTIFIER).val);
+	Token id = l.eat(IDENTIFIER);
+	std::string name = std::get<std::string>(id.val);
 
-	Decl *out = new Decl(Var(scope->vec.size(), scope));
+	AST *out = new AST(DECL, new AST(VAR, Scope::s(cur_scope)->syms.size(), cur_scope));
+
+	if (globl)
+		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, type, name));
+	else
+		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, offset += getsize(type)));
 
 	if (l.pnxt().type == '=')
 	{
-		l.eat((TokType)'=');
-		out->expr = expr();
+		Scope::s(cur_scope)->syms.back().val = true;
+
+		out->op = static_cast<TokType>('=');
+		l.eat(static_cast<TokType>('='));
+		out->rhs = expr();
 	}
 
 	// two calls to a linear search, not good
-	if (scope->in_scope(name))
+	if (Scope::s(cur_scope)->in_scope(name))
 	{
 		if (globl)
 		{
-			auto p = scope->get(name);
-			if (p.second->vec[p.first].node->type == FUNC)
-				parse_err("Redefinition of function " + name, tok);
-			else if (out->expr && p.second->vec[p.first].node->type == DECL && ((Decl*)p.second->vec[p.first].node)->expr)
-				parse_err("Redefinition of variable " + name, tok);
+			auto p = Scope::s(cur_scope)->get(name);
+			Sym &s = Scope::s(p.second)->syms[p.first];
+			if (s.vtype == V_FUNC)
+				parse_err("Redefinition of function " + name, id);
+			else if (out->rhs && s.vtype == V_GLOBL && s.val)
+				parse_err("Redefinition of variable " + name, id);
 		}
 		else
-			parse_err("Redefinition of variable " + name, tok);
+			parse_err("Redefinition of variable " + name, id);
 	}
 
-	if (globl)
-		scope->vec.push_back(Symbol(getsize(type), name, out));
-	else
-	{
-		scope->add_var(type);
-		scope->vec.push_back(Symbol(getsize(type), name, out, scope->stack_index));
-	}
-
-	l.eat((TokType)';');
+	l.eat(static_cast<TokType>(';'));
 
 	return out;
 }
 
 // 'if' '(' expr ')' ( stmt | blk ) [ 'else' ( stmt | blk) ]
-Stmt *Parser::if_stmt()
+// lhs = cond, mid = if, rhs = else
+AST *Parser::if_stmt()
 {
-	If *out = new If;
+	AST *out = new AST(IF);
 
 	l.eat(KEY_IF);
-	l.eat((TokType)'(');
+	l.eat(static_cast<TokType>('('));
 
-	out->cond = expr();
+	out->lhs = expr();
 
-	l.eat((TokType)')');
+	l.eat(static_cast<TokType>(')'));
 
-	/*if (l.peek_next().type == '{')
-		out->if_blk = blk();
-	else*/
-		out->if_blk = stmt();
+	out->mid = stmt();
 
 	if (l.pnxt().type == KEY_ELSE)
 	{
 		l.eat(KEY_ELSE);
 
-		/*if (l.peek_next().type == '{')
-			out->else_blk = blk();
-		else*/
-			out->else_blk = stmt();
+		out->rhs = stmt();
 	}
 
 	return out;
 }
 
 // KEY_FOR '(' ( exp_option ';' | decl ) exp_option ';' exp_option ')' stmt
-Stmt *Parser::for_stmt()
+// lhs = init, mid = cond, rhs->lhs = compound, rhs->rhs = post
+AST *Parser::for_stmt()
 {
 	l.eat(KEY_FOR);
-	l.eat((TokType)'(');
+	l.eat(static_cast<TokType>('('));
+	
+	AST *out = new AST();
+	AST *child = new AST(FOR);
+	out->rhs = child;
+
+	bool declaration = is_type(l.pnxt().type);
+
+	out->type = declaration ? FOR_DECL : FOR;
 
 	// parse decl
-	if (is_type(l.pnxt().type))
+	if (declaration)
 	{
-		ForDecl *out = new ForDecl;
+		cur_scope = Scope::new_scope(cur_scope);
+		out->val = cur_scope;
 
-		scope = new Scope(scope, scope->stack_index);
-		out->for_scope = scope;
-
-		out->init = decl();
-		out->cond = exp_option();
-		l.eat((TokType)';');
-		out->post = exp_option();
-		l.eat((TokType)')');
-
-		in_loop = true;
-		out->blk = stmt();
-		in_loop = false;
-
-		scope = scope->parent_scope;
-
-		return out;
+		out->lhs = decl();
 	}
 	else
 	{
-		For *out = new For;
-		out->init = exp_option();
-		l.eat((TokType)';');
-		out->cond = exp_option();
-		l.eat((TokType)';');
-		out->post = exp_option();
-		l.eat((TokType)')');
-
-		in_loop = true;
-		out->blk = stmt();
-		in_loop = false;
-
-		return out;
+		out->lhs = exp_option();
+		l.eat(static_cast<TokType>(';'));
 	}
+
+	out->mid = exp_option();
+	l.eat(static_cast<TokType>(';'));
+	child->rhs = exp_option();
+	l.eat(static_cast<TokType>(')'));
+
+	in_loop = true;
+	child->lhs = stmt();
+
+	if (declaration)
+		cur_scope = Scope::s(cur_scope)->parent_id;
+
+	in_loop = false;
+
+	return out;
 }
 
 // KEY_WHILE '(' expr ')' stmt
-Stmt *Parser::while_stmt()
+// lhs = cond, rhs = blk
+AST *Parser::while_stmt()
 {
-	While *out = new While;
+	AST *out = new AST(WHILE);
 
 	l.eat(KEY_WHILE);
-	l.eat((TokType)'(');
+	l.eat(static_cast<TokType>('('));
 
-	out->cond = expr();
+	out->lhs = expr();
 
-	l.eat((TokType)')');
+	l.eat(static_cast<TokType>(')'));
 
 	in_loop = true;
-	out->blk = stmt();
+	out->rhs = stmt();
 	in_loop = false;
 
 	return out;
 }
 
 // KEY_DO stmt KEY_WHILE '(' expr ')' ';'
-Stmt *Parser::do_stmt()
+// lhs = cond, rhs = blk
+AST *Parser::do_stmt()
 {
-	Do *out = new Do;
+	AST *out = new AST(DO);
 
 	l.eat(KEY_DO);
 
 	in_loop = true;
-	out->blk = stmt();
+	out->rhs = stmt();
 	in_loop = false;
 
 	l.eat(KEY_WHILE);
-	l.eat((TokType)'(');
+	l.eat(static_cast<TokType>('('));
 
-	out->cond = expr();
+	out->lhs = expr();
 
-	l.eat((TokType)')');
-	l.eat((TokType)';');
+	l.eat(static_cast<TokType>(')'));
+	l.eat(static_cast<TokType>(';'));
 
 	return out;
 }
 
 // '{' { stmt | decl } '}'
-Compound *Parser::compound(bool newscope)
+// block stored in lhs
+AST *Parser::compound(bool newscope)
 {
-	Compound *out;
-
 	if (newscope)
-	 	out = new Compound((scope = new Scope(scope, scope->stack_index)));
-	else
-	 	out = new Compound(scope);
+		cur_scope = Scope::new_scope(cur_scope);
+	
+	AST *out = new AST(BLOCK, cur_scope);
+	AST *bottom = out->lhs;
 
-	l.eat((TokType)'{');
+	l.eat(static_cast<TokType>('{'));
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	while (t && t != '}')
 	{
 		if (is_type(t))
-			out->vec.push_back(decl());
+			bottom = AST::append(bottom, decl(), BLOCK);
 		else
-			out->vec.push_back(stmt());
+			bottom = AST::append(bottom, stmt(), BLOCK);
 		
 		tok = l.pnxt();
 		t = tok.type;
@@ -414,10 +386,10 @@ Compound *Parser::compound(bool newscope)
 	if (!t)
 		parse_err("Unterminated function body", tok);
 
-	l.eat((TokType)'}');
+	l.eat(static_cast<TokType>('}'));
 
 	// reset scope
-	scope = scope->parent_scope;
+	cur_scope = Scope::s(cur_scope)->parent_id;
 
 	return out;
 }
@@ -425,16 +397,17 @@ Compound *Parser::compound(bool newscope)
 // -------- expressions -------- //
 
 // IDENTIFIER
-Expr *Parser::lval()
+AST *Parser::lval()
 {
-	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	return new Var(p.first, p.second);
+	auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
+	return new AST(VAR, p.first, p.second);
 }
 
 // lval assign expr
-Expr *Parser::assign()
+// lhs t rhs
+AST *Parser::assign()
 {
-	Expr *lv = lval();
+	AST *lv = lval();
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
@@ -443,41 +416,41 @@ Expr *Parser::assign()
 	
 	l.eat(t);
 
-	return new Assign(t, lv, expr());
+	return new AST(ASSIGN, t, lv, expr());
 }
 
 // -------- binary operations -------- //
 
-#define BINEXP(func, call_func, type_eval)  	  \
-	Expr *Parser::func()						  \
-	{											  \
-		Expr *out = call_func();				  \
-		TokType t = l.pnxt().type;				  \
-												  \
-		while (type_eval)						  \
-		{										  \
-			l.eat(t);							  \
-			out = new BinOp(t, out, call_func()); \
-			t = l.pnxt().type;					  \
-		}										  \
-												  \
-		return out;								  \
+#define BINEXP(func, call_func, type_eval)             \
+	AST *Parser::func()                                \
+	{                                                  \
+		AST *out = call_func();                        \
+		TokType t = l.pnxt().type;                     \
+                                                       \
+		while (type_eval)                              \
+		{                                              \
+			l.eat(t);                                  \
+			out = new AST(BINOP, t, out, call_func()); \
+			t = l.pnxt().type;                         \
+		}                                              \
+                                                       \
+		return out;                                    \
 	}
 
 // op_or [ '?' expr ':' cond ]
-Expr *Parser::cond()
+AST *Parser::cond()
 {
-	Expr *c = op_or();
+	AST *c = op_or();
 
 	if (l.pnxt().type == '?')
 	{
-		l.eat((TokType)'?');
+		l.eat(static_cast<TokType>('?'));
 
-		Expr *t = expr();
+		AST *t = expr();
 
-		l.eat((TokType)':');
+		l.eat(static_cast<TokType>(':'));
 
-		return new Cond(c, t, cond());
+		return new AST(COND, c, t, cond());
 	}
 	else
 		return c;
@@ -514,50 +487,52 @@ BINEXP(term, factor, t == '+' || t == '-')
 BINEXP(factor, unop, t == '/' || t == '*' || t == '%')
 
 // postfix | ( OP_INC | OP_DEC | '&' | '* ) lval | ( '!' | '~' | '-' ) unop
-Expr *Parser::unop()
+// lhs = operand
+AST *Parser::unop()
 {
 	TokType t = l.pnxt().type;
 	if (t == OP_INC || t == OP_DEC || t == '&' || t == '*')
 	{
 		l.eat(t);
 
-		return new UnOp(t, lval());
+		return new AST(UNOP, t, lval());
 	}
 	else if (t == '!' || t == '~' || t == '-')
 	{
 		l.eat(t);
 
-		return new UnOp(t, unop());
+		return new AST(UNOP, t, unop());
 	}
 	else
 		return postfix();
 }
 
 // primary [ OP_INC | OP_DEC ]
-Expr *Parser::postfix()
+AST *Parser::postfix()
 {
-	Expr *p = primary();
+	AST *p = primary();
 
 	TokType t = l.pnxt().type;
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
-		return new Post(t, p);
+		return new AST(POSTFIX, t, p);
 	}
 	else
 		return p;
 }
 
 // call | INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | CHAR_CONSTANT | IDENTIFIER | '(' expr ')'
-Expr *Parser::primary()
+AST *Parser::primary()
 {
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 
-	if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT || t == CHAR_CONSTANT)
+	// if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT || t == CHAR_CONSTANT)
+	if (t == INT_CONSTANT || t == CHAR_CONSTANT)
 	{
 		l.eat(t);
-		return new Const(tok);
+		return new AST(CONST, std::get<long long>(tok.val));
 	}
 	else if (t == IDENTIFIER)
 	{
@@ -565,42 +540,51 @@ Expr *Parser::primary()
 			return call();
 		else
 		{
-			auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-			return new Var(p.first, p.second);
+			auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
+			// scope entry and scope id
+			return new AST(VAR, p.first, p.second);
 		}
 	}
 	else if (t == '(')
 	{
-		l.eat((TokType)('('));
-		Expr *out = expr();
-		l.eat((TokType)(')'));
+		l.eat(static_cast<TokType>(('(')));
+		AST *out = expr();
+		l.eat(static_cast<TokType>((')')));
 
 		return out;
 	}
 
 	parse_err(std::string("Invalid expression ") + l.getname(t), tok);
-	return nullptr;
 }
 
 // IDENTIFIER '(' [ expr { ',' expr } ] ')'
-Expr *Parser::call()
+AST *Parser::call()
 {
-	Call *out = new Call;
+	AST *out = new AST(CALL);
 
-	// get function from scope
-	auto p = scope->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	out->func = Var(p.first, p.second);
+	// get symbol from scope
+	Token id = l.eat(IDENTIFIER);
 
-	l.eat((TokType)'(');
+	auto p = Scope::s(cur_scope)->get(std::get<std::string>(id.val));
+	out->lhs = new AST(VAR, p.first, p.second);
+
+	if (Scope::s(p.second)->syms[p.first].vtype != V_FUNC)
+		parse_err("Attempting to call variable", id);
+
+	l.eat(static_cast<TokType>('('));
+
+	int param_count = 0;
+	AST *list_bottom = out->rhs;
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	while (t && t != ')')
 	{
-		out->params.push_back(expr());
+		list_bottom = AST::append(list_bottom, expr(), LIST);
+		++param_count;
 
 		if (l.pnxt().type != ')')
-			l.eat((TokType)',');
+			l.eat(static_cast<TokType>(','));
 		
 		tok = l.pnxt();
 		t = tok.type;
@@ -609,12 +593,11 @@ Expr *Parser::call()
 	if (!t)
 		parse_err("Unclosed parentheses in function call", tok);
 	
-	if (p.second->vec[p.first].node->type != FUNC)
-		parse_err("Attempting to call variable", tok);
-	if (out->params.size() != ((Func*)p.second->vec[p.first].node)->params.size())
-		parse_err("Too many arguments to function call", tok);
+	// TODO: add back in checking for param count
+	// if (param_count != ((Func*)p.second->vec[p.first].node)->params.size())
+	// 	parse_err("Too many arguments to function call", tok);
 
-	l.eat((TokType)')');
+	l.eat(static_cast<TokType>(')'));
 
 	return out;
 }
@@ -622,20 +605,19 @@ Expr *Parser::call()
 // -------- main program blk -------- //
 
 // statementlist = { func | decl }
-Compound *Parser::parse()
+AST *Parser::parse()
 {
-	Compound *out = new Compound(scope);
+	AST *out = new AST(BLOCK);
+	AST *bottom = out;
 
 	TokType t = l.peek(3).type;
+
 	while (l.pnxt().type)
 	{
-		if (t)
-		{
-			if (t == '(')
-				out->vec.push_back(func());
-			else
-				out->vec.push_back(decl());
-		}
+		if (t == '(')
+			bottom = AST::append(bottom, func(), BLOCK);
+		else
+			bottom = AST::append(bottom, decl(), BLOCK);
 
 		t = l.peek(3).type;
 	}

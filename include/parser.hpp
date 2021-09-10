@@ -4,11 +4,12 @@
 #include <vector>
 
 #include <codegen.hpp>
-#include <symtab.hpp>
 #include <lexer.hpp>
+#include <scope.hpp>
 
 enum NodeType {
 	NONE,
+	LIST,
 	BLOCK,
 	IF,
 	FOR,
@@ -18,6 +19,7 @@ enum NodeType {
 	DECL,
 	ASSIGN,
 	FUNC,
+	PARAM,
 	RET,
 	BINOP,
 	UNOP,
@@ -31,175 +33,78 @@ enum NodeType {
 	PTR,
 };
 
-struct Node {
+struct AST {
 	NodeType type;
-	virtual void emit(Gen &g) const {}
-};
-struct Stmt : Node {};
-struct Expr : Node {};
-
-struct Var : Expr {
-	int entry;
-	std::vector<Symbol> *vars;
-
-	Var() { type = VAR; }
-	Var(int entry, Scope *scope)
-		: entry(entry)
-		, vars(&scope->vec) { type = VAR; }
-
-	// NOTE: should only be called after parsing is done and vec size will not change
-	Symbol &get() const { return (*vars)[entry]; }
-
-	void mov(bool from_var, Gen &g) const;
-	void emit(Gen &g) const override;
-};
-
-struct Compound : Stmt {
-	std::vector<Node *> vec;
-	Scope *scope;
-	bool func;
-	Compound() : func(false) { type = BLOCK; }
-	Compound(Scope *scope) : scope(scope), func(false) { type = BLOCK; }
-	void emit(Gen &g) const override;
-};
-
-struct If : Stmt {
-	Expr *cond;
-	Node *if_blk, *else_blk;
-	If() { type = IF; }
-	If(Expr *cond, Node *if_blk)
-		: cond(cond)
-		, if_blk(if_blk)
-		, else_blk(nullptr) { type = IF; }
-	If(Expr *cond, Node *if_blk, Node *else_blk)
-		: cond(cond)
-		, if_blk(if_blk)
-		, else_blk(else_blk) { type = IF; }
-	void emit(Gen &g) const override;
-};
-
-struct For : Stmt {
-	Expr *init, *cond;
-	Node *blk, *post;
-	For() { type = FOR; }
-	void emit(Gen &g) const override;
-};
-
-struct Decl;
-
-struct ForDecl : Stmt {
-	Scope *for_scope;
-	Decl *init;
-	Expr *cond;
-	Node *blk, *post;
-	ForDecl() { type = FOR_DECL; }
-	void emit(Gen &g) const override;
-};
-
-struct While : Stmt {
-	Node *blk;
-	Expr *cond;
-	While() { type = WHILE; }
-	void emit(Gen &g) const override;
-};
-
-struct Do : Stmt {
-	Node *blk;
-	Expr *cond;
-	Do() { type = DO; }
-	void emit(Gen &g) const override;
-};
-
-struct Func : Stmt {
-	Var name;
-	std::vector<Var> params;
-	Compound *blk;
-	Func() { type = FUNC; }
-	void emit(Gen &g) const override;
-};
-
-struct Ret : Stmt {
-	Expr *r;
-	Ret() { type = RET; }
-	Ret(Expr *r) : r(r) { type = RET; }
-	void emit(Gen &g) const override;
-};
-
-struct Decl : Stmt {
-	Var v;
-	Expr *expr;
-	Decl() { type = DECL; }
-	Decl(Var v)
-		: v(v)
-		, expr(nullptr) { type = DECL; }
-	void emit(Gen &g) const override;
-};
-
-// -------- ast expressions -------- //
-
-struct BinOp : Expr {
 	TokType op;
-	Expr *lhs, *rhs;
-	BinOp() { type = BINOP; }
-	BinOp(TokType op, Expr *lhs, Expr *rhs)
-		: op(op)
-		, lhs(lhs)
-		, rhs(rhs) { type = BINOP; }
-	void emit(Gen &g) const override;
-};
+	AST *lhs, *mid, *rhs;
 
-struct UnOp : Expr {
-	TokType op;
-	Expr *operand;
-	UnOp() { type = UNOP; }
-	UnOp(TokType op, Expr *operand)
-		: op(op)
-		, operand(operand) { type = UNOP; }
-	void emit(Gen &g) const override;
-};
+	int val;
+	int scope_id;
 
-struct Post : Expr {
-	TokType op;
-	Expr *operand;
-	Post() { type = POSTFIX; }
-	Post(TokType op, Expr *operand)
-		: op(op)
-		, operand(operand) { type = UNOP; }
-	void emit(Gen &g) const override;
-};
+	// appends to an "ast list"
+	// ordering: top down, left to right
+	static AST *append(AST *bottom, AST *node, NodeType t)
+	{
+		// if rhs available
+		if (!bottom->rhs)
+		{
+			bottom->rhs = node;
+			return bottom;
+		}
+		// if mid available
+		else if (!bottom->mid)
+		{
+			bottom->mid = node;
+			return bottom;
+		}
+		// if lhs available
+		else if (!bottom->lhs)
+		{
+			bottom->lhs = node;
+			return bottom;
+		}
+		// none are avaiable, make new ast
+		else
+		{
+			AST *new_bottom = new AST(t);
+			new_bottom->lhs = node;
 
-struct Assign : Expr {
-	TokType op;
-	Expr *lval, *rval;
-	Assign() { type = ASSIGN; }
-	Assign(TokType op, Expr *lval, Expr *rval)
-		: op(op)
-		, lval(lval)
-		, rval(rval) { type = ASSIGN; }
-	void emit(Gen &g) const override;
-};
+			bottom->rhs = new_bottom;
+			return new_bottom;
+		}
+	}
 
-struct Cond : Expr {
-	Expr *cond, *t, *f;
-	Cond() { type = COND; }
-	Cond(Expr *cond, Expr *t, Expr *f)
-		: cond(cond)
-		, t(t)
-		, f(f) { type = COND; }
-	void emit(Gen &g) const override;
-};
+	// generic constructors
+	AST(NodeType type, AST *lhs, AST *mid, AST *rhs)
+		: type(type), lhs(lhs), mid(mid), rhs(rhs) {}
 
-struct Call : Expr {
-	Var func;
-	std::vector<Expr*> params;
-	Call() { type = CALL; }
-	void emit(Gen &g) const override;
-};
+	AST(NodeType type, AST *lhs, AST *rhs)
+		: type(type), lhs(lhs), mid(nullptr), rhs(rhs) {}
 
-struct Const : Expr {
-	Token t;
-	Const(const Token &t) : t(t) { type = CONST; }
-	void emit(Gen &g) const override;
+	AST(NodeType type, AST *lhs)
+		: AST(type, lhs, nullptr, nullptr) {}
+
+	AST(NodeType type)
+		: AST(type, nullptr, nullptr, nullptr) {}
+
+	// op constructors
+	AST(NodeType type, TokType op, AST *lhs, AST *rhs)
+		: type(type), op(op), lhs(lhs), mid(nullptr), rhs(rhs) {}
+
+	AST(NodeType type, TokType op, AST *lhs)
+		: AST(type, op, lhs, nullptr) {}
+
+	// val leaf
+	AST(NodeType type, int val)
+		: type(type), lhs(nullptr), mid(nullptr), rhs(nullptr), val(val) {}
+
+	// var
+	AST(NodeType type, int scope_entry, int scope_id)
+		: type(type), lhs(nullptr), mid(nullptr), rhs(nullptr), val(scope_entry), scope_id(scope_id) {}
+
+	// to be safe
+	AST()
+		: lhs(nullptr), mid(nullptr), rhs(nullptr) {}
 };
 
 // -------- class def -------- //
@@ -209,48 +114,50 @@ class Parser
 	Lexer &l;
 
 	// context
-	Scope *scope;
+	int cur_scope;
+	int offset;
 	bool in_loop;
 
-	Expr *expr();
-	Expr *exp_option();
-	Node *stmt();
+	AST *expr();
+	AST *exp_option();
+	AST *stmt();
 
-	Stmt *func();
-	Decl *decl();
-	Stmt *if_stmt();
-	Stmt *for_stmt();
-	Stmt *while_stmt();
-	Stmt *do_stmt();
+	AST *func();
+	AST *decl();
+	AST *if_stmt();
+	AST *for_stmt();
+	AST *while_stmt();
+	AST *do_stmt();
 
-	Compound *compound(bool newscope=true);
+	AST *compound(bool newscope=true);
 
-	Expr *lval();
-	Expr *assign();
+	AST *lval();
+	AST *assign();
 
-	Expr *cond();
-	Expr *op_or();
-	Expr *op_and();
-	Expr *bitwise_or();
-	Expr *bitwise_xor();
-	Expr *bitwise_and();
-	Expr *equality();
-	Expr *comparison();
-	Expr *shift();
-	Expr *term();
-	Expr *factor();
-	Expr *unop();
-	Expr *postfix();
-	Expr *primary();
-	Expr *call();
+	AST *cond();
+	AST *op_or();
+	AST *op_and();
+	AST *bitwise_or();
+	AST *bitwise_xor();
+	AST *bitwise_and();
+	AST *equality();
+	AST *comparison();
+	AST *shift();
+	AST *term();
+	AST *factor();
+	AST *unop();
+	AST *postfix();
+	AST *primary();
+	AST *call();
 
 	void parse_err(const std::string &msg, const Token &err_tok);
 
 public:
 	Parser(Lexer &l)
 		: l(l)
-		, scope(new Scope(nullptr, 0))
+		// create global scope
+		, cur_scope(Scope::new_scope(0))
 		, in_loop(false) {}
 
-	Compound *parse();
+	AST *parse();
 };
