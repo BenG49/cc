@@ -88,8 +88,8 @@ struct AST {
 		: type(type), lhs(nullptr), mid(nullptr), rhs(nullptr), val(val) {}
 
 	// var
-	AST(NodeType type, int scope_entry, int scope_id)
-		: type(type), lhs(nullptr), mid(nullptr), rhs(nullptr), val(scope_entry), scope_id(scope_id) {}
+	AST(int entry, int scope_id)
+		: type(VAR), lhs(nullptr), mid(nullptr), rhs(nullptr), val(entry), scope_id(scope_id) {}
 
 	// to be safe
 	AST()
@@ -183,6 +183,7 @@ public:
 		: l(l)
 		// create global scope
 		, cur_scope(Scope::new_scope(0))
+		, offset(0)
 		, in_loop(false) {}
 
 	AST *parse();

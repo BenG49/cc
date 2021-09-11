@@ -129,12 +129,12 @@ Reg emit_binop(Reg src, Reg dst, TokType op)
 		src = emit_mov(src, C, Quad);
 
 	switch (op) {
-		case '+': out << "\tadd "; break;
-		case '-': out << "\tsub "; break;
-		case '*': out << "\timul "; break;
-		case '|': out << "\tor "; break;
-		case '&': out << "\tand "; break;
-		case '^': out << "\txor "; break;
+		case OP_ADD: out << "\tadd "; break;
+		case OP_SUB: out << "\tsub "; break;
+		case OP_MUL: out << "\timul "; break;
+		case OP_BIT_OR: out << "\tor "; break;
+		case OP_BIT_AND: out << "\tand "; break;
+		case OP_BIT_XOR: out << "\txor "; break;
 		case OP_SHR: out << "\tsar "; break;
 		case OP_SHL: out << "\tsal "; break;
 	}
@@ -237,6 +237,55 @@ Reg logic_or_jmp(Reg a, AST *b, int lbl)
 
 }
 
+
+
+Reg load_var(const Sym &s)
+{
+	Reg r = alloc_reg();
+
+	Size sz = getsize(s.type);
+
+	out << '\t' << MOV[sz];
+
+	switch (s.vtype) {
+		case V_VAR:
+			if (s.val) out << s.val;
+			out << "(%rbp), ";
+			break;
+
+		case V_GLOBL:
+			out << s.name << "(%rip), ";
+			break;
+	}
+
+	out << REGS[sz][r] << '\n';
+	return r;
+}
+
+Reg set_var(Reg r, const Sym &s)
+{
+	Size sz = getsize(s.type);
+
+	out << '\t' << MOV[sz] << REGS[sz][r] << ", ";
+
+	switch (s.vtype) {
+		case V_VAR:
+			if (s.val) out << s.val;
+			out << "(%rbp)";
+			break;
+
+		case V_GLOBL:
+			out << s.name << "(%rip)";
+			break;
+	}
+
+	out << '\n';
+
+	return r;
+}
+
+
+
 void emit_func_hdr(int sym, int scopeid, int offset)
 {
 	Sym &s = Scope::s(scopeid)->syms[sym];
@@ -245,8 +294,10 @@ void emit_func_hdr(int sym, int scopeid, int offset)
 	out << s.name << ":\n";
 	out << "\tpush %rbp\n\tmov %rsp, %rbp\n";
 
-	if (offset)
-		out << "subq $" << offset << ", %rbp\n";
+	if (offset < 0)
+		out << "\tsub $" << (-offset) << ", %rsp\n";
+	else if (offset > 0)
+		out << "\tadd $" << offset << ", %rsp\n";
 }
 
 void emit_epilogue() { out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n"; }
@@ -257,14 +308,44 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 {
 	switch (n->type) {
 		case FUNC:
-			// TODO: support different sized local variables
-			emit_func_hdr(n->lhs->val, n->lhs->scope_id, n->val * 4);
+			emit_func_hdr(n->lhs->val, n->lhs->scope_id, n->val);
 			gen_ast(n->rhs, NOREG, n->type);
 			out << "\txor %rax, %rax\n";
 			emit_epilogue();
 			return NOREG;
 		case CONST:
 			return emit_int(n->val);
+		case LIST:
+			if (n->lhs) {
+				gen_ast(n->lhs, NOREG, LIST);
+				if (n->mid) {
+					gen_ast(n->mid, NOREG, LIST);
+					if (n->rhs)
+						gen_ast(n->rhs, NOREG, LIST);
+				}
+			}
+			return NOREG;
+
+		case DECL:
+		case ASSIGN:
+			if (n->rhs)
+			{
+				Sym &s = Scope::s(n->lhs->scope_id)->syms[n->lhs->val];
+				// get rvalue, set lvalue
+				return set_var(gen_ast(n->rhs, NOREG, n->type), s);
+			}
+			return NOREG;
+
+		case VAR: {
+			Sym &s = Scope::s(n->scope_id)->syms[n->val];
+
+			if (parent == DECL || (parent == ASSIGN && reg != NOREG))
+				return set_var(reg, s);
+			// not assigning
+			else
+				return load_var(s);
+		}
+
 		default: break;
 	}
 
@@ -284,6 +365,7 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 			emit_epilogue();
 			free_all();
 			return NOREG;
+
 		default: break;
 	}
 

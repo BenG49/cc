@@ -68,6 +68,9 @@ Reg logic_or_set(Reg a, AST *b);
 Reg logic_and_jmp(Reg a, AST *b);
 Reg logic_or_jmp(Reg a, AST *b);
 
+Reg load_var(const Sym &s);
+Reg set_var(Reg r, const Sym &s);
+
 void emit_func_hdr(int sym, int scopeid, int offset);
 void emit_epilogue();
 

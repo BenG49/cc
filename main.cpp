@@ -98,12 +98,14 @@ void prettyprint(const AST *ast, int tabs)
 		
 		case DECL: {
 			Sym &s = Scope::s(ast->lhs->scope_id)->syms[ast->lhs->val];
-			printf("DECL TYPE TYPE(%s) NAME(%s)\n", Lexer::getname(s.type), s.name.c_str());
+			printf("DECL %s %s\n", Lexer::getname(s.type), s.name.c_str());
+			if (ast->rhs)
+				prettyprint(ast->rhs, tabs + 1);
 			break;
 		}
 		
 		case VAR:
-			printf("VAR NAME(%s)\n", Scope::s(ast->scope_id)->syms[ast->val].name.c_str());
+			printf("VAR %s\n", Scope::s(ast->scope_id)->syms[ast->val].name.c_str());
 			break;
 		
 		case COND:
@@ -123,6 +125,14 @@ void prettyprint(const AST *ast, int tabs)
 
 			break;
 		
+		case ASSIGN:
+			puts("=");
+			
+			prettyprint(ast->lhs, tabs + 1);
+			prettyprint(ast->rhs, tabs + 1);
+
+			break;
+		
 		default: printf("megacringe %d\n", ast->type); break;
 	};
 }
@@ -135,20 +145,6 @@ int main(int argc, const char *argv[]) {
 	}
 
 	Lexer l(argv[1]);
-
-	/*TokType t = l.pnxt().type;
-	while (t) {
-		std::cout << "TOK " << t << ' ' << Lexer::getname(t);
-
-		if (t == INT_CONSTANT)
-			std::cout << ' ' << std::get<long long>(l.pnxt().val);
-		else if (t == STR_CONSTANT || t == IDENTIFIER)
-			std::cout << ' ' << std::get<std::string>(l.pnxt().val);
-		
-		std::cout << '\n';
-		l.eat(t);
-		t = l.pnxt().type;
-	}*/
 
 	Parser p(l);
 	AST *ast = p.parse();

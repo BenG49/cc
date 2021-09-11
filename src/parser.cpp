@@ -117,15 +117,14 @@ AST *Parser::func()
 
 	// add to sym tab
 	globl->syms.push_back(Sym(V_FUNC, t, name, 0));
-
-	out->lhs = new AST(VAR, globl->syms.size() - 1, Scope::GLOBAL);
+	out->lhs = new AST(globl->syms.size() - 1, Scope::GLOBAL);
 
 	l.eat(LPAREN);
 	
 	// parameters //
 
 	// 8 for func ptr, 8 for rbp, -8 for the offset += 8
-	int offset = 8;
+	int p_offset = 8;
 	int param_count = 0;
 	cur_scope = Scope::new_scope(cur_scope);
 	Scope *cur = Scope::s(cur_scope);
@@ -148,9 +147,9 @@ AST *Parser::func()
 		else
 			cur->syms.push_back(Sym(V_VAR, t,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
-				offset += 8));
+				p_offset += 8));
 
-		bottom = AST::append(bottom, new AST(VAR, cur->syms.size(), cur_scope), LIST);
+		bottom = AST::append(bottom, new AST(cur->syms.size() - 1, cur_scope), LIST);
 
 		++param_count;
 
@@ -194,6 +193,7 @@ AST *Parser::func()
 	// scope is reset in compound
 	offset = 0;
 	out->rhs = compound(false);
+	out->val = offset;
 
 	return out;
 }
@@ -213,7 +213,7 @@ AST *Parser::decl()
 	Token id = l.eat(IDENTIFIER);
 	std::string name = std::get<std::string>(id.val);
 
-	AST *out = new AST(DECL, new AST(VAR, Scope::s(cur_scope)->syms.size(), cur_scope));
+	AST *out = new AST(DECL, new AST(Scope::s(cur_scope)->syms.size(), cur_scope));
 
 	bool assigned = l.pnxt().type == OP_SET;
 
@@ -236,11 +236,12 @@ AST *Parser::decl()
 	if (globl)
 		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, type, name));
 	else
-		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, offset += getsize(type)));
+		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, (offset -= (1 << getsize(type)))));
 
 	if (assigned)
 	{
-		Scope::s(cur_scope)->syms.back().val = true;
+		if (globl)
+			Scope::s(cur_scope)->syms.back().val = true;
 
 		out->op = OP_SET;
 		l.eat(OP_SET);
@@ -384,9 +385,7 @@ AST *Parser::compound(bool newscope)
 		if (is_type(t))
 			bottom = AST::append(bottom, decl(), LIST);
 		else
-		{
 			bottom = AST::append(bottom, stmt(), LIST);
-		}
 		
 		tok = l.pnxt();
 		t = tok.type;
@@ -409,7 +408,7 @@ AST *Parser::compound(bool newscope)
 AST *Parser::lval()
 {
 	auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	return new AST(VAR, p.first, p.second);
+	return new AST(p.first, p.second);
 }
 
 // lval assign expr
@@ -553,7 +552,7 @@ AST *Parser::primary()
 		{
 			auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
 			// scope entry and scope id
-			return new AST(VAR, p.first, p.second);
+			return new AST(p.first, p.second);
 		}
 	}
 	else if (t == LPAREN)
@@ -578,7 +577,7 @@ AST *Parser::call()
 	Token id = l.eat(IDENTIFIER);
 
 	auto p = Scope::s(cur_scope)->get(std::get<std::string>(id.val));
-	out->lhs = new AST(VAR, p.first, p.second);
+	out->lhs = new AST(p.first, p.second);
 
 	if (Scope::s(p.second)->syms[p.first].vtype != V_FUNC)
 		parse_err("Attempting to call variable", id);

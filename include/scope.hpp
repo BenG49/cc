@@ -26,6 +26,7 @@ struct Scope {
 
     std::vector<Sym> syms;
 
+    // entry, id
     std::pair<int, int> get(const std::string &name);
     bool in_scope(const std::string &name);
 
