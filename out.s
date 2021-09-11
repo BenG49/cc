@@ -1,23 +1,19 @@
-.data
-
-.text
-
 .globl main
 main:
 	push %rbp
 	mov %rsp, %rbp
-	sub $1, %rsp
-	mov $48, %al
-	movb %al, -1(%rbp)
-	mov $1, %eax
-	push %rax
-	movb -1(%rbp), %al
-	pop %rcx
-	add %ecx, %eax
+	movq $12, %r10
+	neg %r10
+	movq $5, %r11
+	movq %r10, %rax
+	cqo
+	idiv %r11
+	movq %rax, %r11
+	movl %r11d, %eax
 	mov %rbp, %rsp
 	pop %rbp
 	ret
-	xor %eax, %eax
+	xor %rax, %rax
 	mov %rbp, %rsp
 	pop %rbp
 	ret

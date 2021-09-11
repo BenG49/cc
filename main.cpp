@@ -1,6 +1,7 @@
 #include <iostream>
 
-#include <parser.hpp>
+#include <codegen.hpp>
+#include <scope.hpp>
 
 void ptabs(int count)
 {
@@ -8,79 +9,86 @@ void ptabs(int count)
 		printf("  ");
 }
 
-void prettyprint(const Node *ast, int tabs, const Scope &s)
+void prettyprint(const AST *ast, int tabs)
 {
-	ptabs(tabs);
-
 	if (!ast)
 	{
-		puts("0");
+		puts("");
 		return;
 	}
 
+	ptabs(tabs);
+
 	switch (ast->type) {
-		case BLOCK:
-			puts("BLOCK:");
-			for (Node *n : ((Compound*)ast)->vec)
-				prettyprint(n, tabs + 1, s);
+		case LIST: {
+			puts("LIST:");
+
+			ASTIter i(ast);
+			while (i.has_next())
+				prettyprint(i.next(), tabs + 1);
+
 			break;
+		}
 
 		case IF:
 			puts("IF");
-			prettyprint(((If*)ast)->cond, tabs + 1, s);
+			prettyprint(ast->lhs, tabs + 1);
 
 			ptabs(tabs);
 			puts("THEN");
-			prettyprint(((If*)ast)->if_blk, tabs + 1, s);
+			prettyprint(ast->mid, tabs + 1);
 
-			if (((If*)ast)->else_blk)
+			if (ast->rhs)
 			{
 				ptabs(tabs);
 				puts("ELSE");
-				prettyprint(((If*)ast)->else_blk, tabs + 1, s);
+				prettyprint(ast->rhs, tabs + 1);
 			}
 
 			break;
 
-		case FUNC:
-			printf("FUNC TYPE SIZE(%d)", ((Func*)ast)->name.get().size);
-			printf(" NAME(%s)", ((Func*)ast)->name.get().name.c_str());
+		case FUNC: {
+			Sym &s = Scope::s(ast->lhs->scope_id)->syms[ast->lhs->val];
+			printf("FUNC %s %s", Lexer::getname(s.type), s.name.c_str());
 			puts(" PARAMS:");
 			
-			for (unsigned i = 0; i < ((Func*)ast)->params.size(); ++i)
+			ASTIter i(ast->mid);
+			while (i.has_next())
 			{
-				Var s = ((Func*)ast)->params.at(i);
 				ptabs(tabs + 1);
-				printf("%d %s\n", s.type, s.get().name.c_str());
+				AST *a = i.next();
+				Sym &s = Scope::s(a->scope_id)->syms[a->val];
+				printf("%s %s\n", Lexer::getname(s.type), s.name.c_str());
 			}
 
-			prettyprint(((Func*)ast)->blk, tabs + 1, s);
+			prettyprint(ast->rhs, tabs + 1);
 			break;
+		}
 
 		case RET:
 			puts("RET:");
-			prettyprint(((Ret*)ast)->r, tabs + 1, s);
+			prettyprint(ast->lhs, tabs + 1);
 			break;
 		
 		case BINOP:
 			printf("OP: ");
-			puts(Lexer::getname(((BinOp*)ast)->op));
-			prettyprint(((BinOp*)ast)->lhs, tabs + 1, s);
-			prettyprint(((BinOp*)ast)->rhs, tabs + 1, s);
+			puts(Lexer::getname(ast->op));
+			prettyprint(ast->lhs, tabs + 1);
+			prettyprint(ast->rhs, tabs + 1);
 			break;
 		
 		case UNOP:
 			printf("OP: ");
-			puts(Lexer::getname(((UnOp*)ast)->op));
-			prettyprint(((UnOp*)ast)->operand, tabs + 1, s);
+			puts(Lexer::getname(ast->op));
+			prettyprint(ast->lhs, tabs + 1);
 			break;
 		
 		case CONST:
 			printf("CONST: ");
-			switch (((Const*)ast)->t.type) {
-				case INT_CONSTANT: printf("%lld", std::get<long long>(((Const*)ast)->t.val)); break;
-				case FP_CONSTANT:  printf("%f", std::get<double>(((Const*)ast)->t.val)); break;
-				case STR_CONSTANT: printf("%s", std::get<std::string>(((Const*)ast)->t.val).c_str()); break;
+			switch (ast->op) {
+				case INT_CONSTANT: printf("%d", ast->val); break;
+				// case FP_CONSTANT:  printf("%f", std::get<double>(((Const*)ast)->t.val)); break;
+				// case STR_CONSTANT: printf("%s", std::get<std::string>(((Const*)ast)->t.val).c_str()); break;
 				default: printf("cringe");
 			}
 
@@ -88,28 +96,30 @@ void prettyprint(const Node *ast, int tabs, const Scope &s)
 
 			break;
 		
-		case DECL:
-			printf("DECL TYPE SIZE(%d) NAME(%s)\n",
-				((Decl*)ast)->v.get().size,
-				((Decl*)ast)->v.get().name.c_str());
-			
+		case DECL: {
+			Sym &s = Scope::s(ast->lhs->scope_id)->syms[ast->lhs->val];
+			printf("DECL TYPE TYPE(%s) NAME(%s)\n", Lexer::getname(s.type), s.name.c_str());
 			break;
+		}
 		
 		case VAR:
-			printf("VAR NAME(%s)\n", ((Var*)ast)->get().name.c_str());
+			printf("VAR NAME(%s)\n", Scope::s(ast->scope_id)->syms[ast->val].name.c_str());
 			break;
 		
 		case COND:
 			puts("IF");
-			prettyprint(((Cond*)ast)->cond, tabs + 1, s);
+			prettyprint(ast->lhs, tabs + 1);
 
 			ptabs(tabs);
 			puts("THEN");
-			prettyprint(((Cond*)ast)->t, tabs + 1, s);
+			prettyprint(ast->mid, tabs + 1);
 
-			ptabs(tabs);
-			puts("ELSE");
-			prettyprint(((Cond*)ast)->f, tabs + 1, s);
+			if (ast->rhs)
+			{
+				ptabs(tabs);
+				puts("ELSE");
+				prettyprint(ast->rhs, tabs + 1);
+			}
 
 			break;
 		
@@ -126,10 +136,10 @@ int main(int argc, const char *argv[]) {
 
 	Lexer l(argv[1]);
 	Parser p(l);
-	Compound *b = p.parse();
+	AST *ast = p.parse();
 
-	// prettyprint(b, 0, s);
+	// prettyprint(ast, 0);
 
-	Gen g("out.s");
-	g.x86_codegen(b);
+	init_cg("out.s");
+	gen_ast(ast, NOREG, NONE);
 }

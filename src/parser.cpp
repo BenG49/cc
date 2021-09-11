@@ -1,5 +1,7 @@
 #include <parser.hpp>
 
+#include <codegen.hpp>
+
 static bool is_type(TokType t)
 {
 	return t == KEY_BOOL || t == KEY_CHAR || t == KEY_INT || t == KEY_FLOAT || t == KEY_VOID;
@@ -97,6 +99,7 @@ AST *Parser::stmt()
 AST *Parser::func()
 {
 	AST *out = new AST(FUNC);
+	out->mid = new AST(LIST);
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
@@ -130,7 +133,7 @@ AST *Parser::func()
 
 	tok = l.pnxt();
 	t = tok.type;
-	while (t && t != ')')
+	while (t != ')')
 	{
 		if (!is_type(t))
 			parse_err("Expected function param type", tok);
@@ -147,7 +150,7 @@ AST *Parser::func()
 				std::get<std::string>(l.eat(IDENTIFIER).val),
 				offset += 8));
 
-		bottom = AST::append(bottom, new AST(VAR, cur->syms.size() - 1, cur_scope), PARAM);
+		bottom = AST::append(bottom, new AST(VAR, cur->syms.size() - 1, cur_scope), LIST);
 
 		if (l.pnxt().type != ')')
 			l.eat(static_cast<TokType>(','));
@@ -365,19 +368,21 @@ AST *Parser::compound(bool newscope)
 	if (newscope)
 		cur_scope = Scope::new_scope(cur_scope);
 	
-	AST *out = new AST(BLOCK, cur_scope);
-	AST *bottom = out->lhs;
+	AST *out = new AST(LIST, cur_scope);
+	AST *bottom = out;
 
 	l.eat(static_cast<TokType>('{'));
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
-	while (t && t != '}')
+	while (t != '}')
 	{
 		if (is_type(t))
-			bottom = AST::append(bottom, decl(), BLOCK);
+			bottom = AST::append(bottom, decl(), LIST);
 		else
-			bottom = AST::append(bottom, stmt(), BLOCK);
+		{
+			bottom = AST::append(bottom, stmt(), LIST);
+		}
 		
 		tok = l.pnxt();
 		t = tok.type;
@@ -532,7 +537,9 @@ AST *Parser::primary()
 	if (t == INT_CONSTANT || t == CHAR_CONSTANT)
 	{
 		l.eat(t);
-		return new AST(CONST, std::get<long long>(tok.val));
+		AST *a = new AST(CONST, std::get<long long>(tok.val));
+		a->op = t;
+		return a;
 	}
 	else if (t == IDENTIFIER)
 	{
@@ -561,6 +568,7 @@ AST *Parser::primary()
 AST *Parser::call()
 {
 	AST *out = new AST(CALL);
+	out->rhs = new AST(LIST);
 
 	// get symbol from scope
 	Token id = l.eat(IDENTIFIER);
@@ -578,7 +586,7 @@ AST *Parser::call()
 
 	Token tok = l.pnxt();
 	TokType t = tok.type;
-	while (t && t != ')')
+	while (t != ')')
 	{
 		list_bottom = AST::append(list_bottom, expr(), LIST);
 		++param_count;
@@ -593,9 +601,8 @@ AST *Parser::call()
 	if (!t)
 		parse_err("Unclosed parentheses in function call", tok);
 	
-	// TODO: add back in checking for param count
-	// if (param_count != ((Func*)p.second->vec[p.first].node)->params.size())
-	// 	parse_err("Too many arguments to function call", tok);
+	if (param_count != Scope::s(p.second)->syms[p.first].val)
+		parse_err("Too many arguments to function call", tok);
 
 	l.eat(static_cast<TokType>(')'));
 
@@ -607,7 +614,7 @@ AST *Parser::call()
 // statementlist = { func | decl }
 AST *Parser::parse()
 {
-	AST *out = new AST(BLOCK);
+	AST *out = new AST(LIST);
 	AST *bottom = out;
 
 	TokType t = l.peek(3).type;
@@ -615,9 +622,9 @@ AST *Parser::parse()
 	while (l.pnxt().type)
 	{
 		if (t == '(')
-			bottom = AST::append(bottom, func(), BLOCK);
+			bottom = AST::append(bottom, func(), LIST);
 		else
-			bottom = AST::append(bottom, decl(), BLOCK);
+			bottom = AST::append(bottom, decl(), LIST);
 
 		t = l.peek(3).type;
 	}

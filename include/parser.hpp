@@ -3,14 +3,12 @@
 #include <fstream>
 #include <vector>
 
-#include <codegen.hpp>
 #include <lexer.hpp>
 #include <scope.hpp>
 
 enum NodeType {
 	NONE,
 	LIST,
-	BLOCK,
 	IF,
 	FOR,
 	FOR_DECL,
@@ -19,7 +17,6 @@ enum NodeType {
 	DECL,
 	ASSIGN,
 	FUNC,
-	PARAM,
 	RET,
 	BINOP,
 	UNOP,
@@ -45,10 +42,10 @@ struct AST {
 	// ordering: top down, left to right
 	static AST *append(AST *bottom, AST *node, NodeType t)
 	{
-		// if rhs available
-		if (!bottom->rhs)
+		// if lhs available
+		if (!bottom->lhs)
 		{
-			bottom->rhs = node;
+			bottom->lhs = node;
 			return bottom;
 		}
 		// if mid available
@@ -57,18 +54,10 @@ struct AST {
 			bottom->mid = node;
 			return bottom;
 		}
-		// if lhs available
-		else if (!bottom->lhs)
-		{
-			bottom->lhs = node;
-			return bottom;
-		}
-		// none are avaiable, make new ast
+		// none are avaiable, add ast to bottom of tree
 		else
 		{
-			AST *new_bottom = new AST(t);
-			new_bottom->lhs = node;
-
+			AST *new_bottom = new AST(t, node);
 			bottom->rhs = new_bottom;
 			return new_bottom;
 		}
@@ -105,6 +94,43 @@ struct AST {
 	// to be safe
 	AST()
 		: lhs(nullptr), mid(nullptr), rhs(nullptr) {}
+};
+
+class ASTIter {
+	const AST *cur;
+	int n;
+
+public:
+	ASTIter(const AST *list)
+		: cur(list), n(0) {}
+	
+	bool has_next()
+	{
+		if (cur)
+		{
+			switch (n) {
+				case 0: return cur->lhs;
+				case 1: return cur->mid;
+				case 2: return cur->rhs && cur->rhs->lhs;
+				default: return false;
+			}
+		}
+		else
+			return false;
+	}
+	
+	AST *next()
+	{
+		switch (n++) {
+			case 0: return cur->lhs;
+			case 1: return cur->mid;
+			case 2:
+				cur = cur->rhs;
+				n = 0;
+				return next();
+			default: return nullptr;
+		}
+	}
 };
 
 // -------- class def -------- //

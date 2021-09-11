@@ -1,52 +1,70 @@
 #pragma once
 
+// based off of https://github.com/DoctorWkt/acwj/
+
 #include <fstream>
 #include <string>
 
-#include <lexer.hpp>
+#include <parser.hpp>
 
-enum Reg { A, B, C, D, DI, SI, BP, SP, R8, R9, R10, R11, R12, R13, R14, R15, IP, COUNT };
+enum Reg {
+	// scratch regs
+	R10,
+	R11,
+	R12,
+	R13,
+	R14,
+	R15,
+
+	// stack regs
+	DI,
+	SI,
+	D,
+	C,
+	R8,
+	R9,
+
+	// etc
+	A,
+	B,
+
+	// pointer regs
+	BP,
+	SP,
+	IP, 
+
+	COUNT,
+	NOREG
+};
+
 enum Size { Byte, Word, Long, Quad };
 
 Size getsize(TokType t);
 
-extern const Reg SYSV_REGS[];
+const Reg ARG_START = DI;
+const int SCRATCH_COUNT = 6;
 extern const char *REGS[4][COUNT];
+extern const char *MOV[4];
 
+void cg_err(const std::string &err);
 
+Reg alloc_reg();
+void free_reg(Reg reg);
+void free_all();
 
-struct Compound;
+// -------- codegen -------- //
 
-class Gen
-{
-	std::ofstream out;
-	int lbl_count;
+Reg emit_mov(Reg a, Reg b, Size s);
+Reg emit_int(int val);
+Reg emit_unop(Reg val, TokType op);
+Reg emit_binop(Reg src, Reg dst, TokType op);
+Reg emit_div(Reg src, Reg dst, TokType op);
+void emit_func_hdr(int sym, int scopeid, int offset);
+void emit_epilogue();
 
-public:
-	Gen(const std::string &outfile)
-		: out(outfile)
-		, lbl_count(0) {}
+// -------- gen -------- //
+	
+// reg = prev ast's output value
+Reg gen_ast(AST *n, Reg reg, NodeType parent);
 
-	void x86_codegen(Compound *ast);
-
-	void emit(const char *str, bool nl=true);
-	void emitc(char c);
-	void emit_int(long long i);
-	void append(const char *str, bool nl=false);
-
-	void label(const char *lbl);
-	void jmp(const char *jmp, const char *lbl);
-	void emit_mov(Size size);
-	void rbp(int offset);
-	void func_epilogue();
-	void emit_reg(Reg r, Size size);
-
-	void comment(const char *str);
-	void nl();
-
-	const char *get_label();
-
-	// kinda bad but whatever
-	const char *break_lbl;
-	const char *cont_lbl;
-};
+void init_cg(const std::string &filename);
