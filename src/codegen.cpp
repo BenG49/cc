@@ -23,6 +23,10 @@ const char *REGS[4][COUNT] = {
 };
 
 const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
+const char *CMP_SET[6] = { "setle ", "setge ", "sete ", "setne ", "setl ", "setg " };
+const char *JMPS[7] = { "jle ", "jge ", "je ", "jne ", "jl ", "jg ", "jmp " };
+
+enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
 
 // vars
 
@@ -67,7 +71,19 @@ void free_all()
 		free_regs[i] = true;
 }
 
+int label() { return lbl_n++; }
+
 // -------- codegen -------- //
+
+Reg emit_jmp(int type, int lbl)
+{
+	out << '\t' << JMPS[type] << 'L' << lbl << '\n';
+}
+
+void emit_lbl(int lbl)
+{
+	out << 'L' << lbl << ":\n";
+}
 
 Reg emit_mov(Reg src, Reg dst, Size s)
 {
@@ -89,7 +105,7 @@ Reg emit_int(int val)
 // TODO: add inc and dec
 Reg emit_unop(Reg val, TokType op)
 {
-	if (op == '!')
+	if (op == OP_NOT)
 	{
 		out << "\ttest " << REGS[Quad][val] << ", " << REGS[Quad][val] << '\n';
 		out << "\tmovq $0, " << REGS[Quad][val] << '\n';
@@ -98,8 +114,8 @@ Reg emit_unop(Reg val, TokType op)
 	}
 
 	switch (op) {
-		case '-': out << "\tneg "; break;
-		case '~': out << "\tnot "; break;
+		case OP_SUB: out << "\tneg "; break;
+		case OP_BIT_NOT: out << "\tnot "; break;
 	}
 
 	out << REGS[Quad][val] << '\n';
@@ -146,6 +162,81 @@ Reg emit_div(Reg src, Reg dst, TokType op)
 	return dst;
 }
 
+Reg cmp_set(Reg a, Reg b, TokType op)
+{
+	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << '\n';
+	out << "\tmov $0, " << REGS[Quad][a] << '\n';
+	out << '\t' << CMP_SET[op - OP_LE] << REGS[Byte][a] << '\n';
+
+	free_reg(b);
+
+	return a;
+}
+
+Reg cmp_jmp(Reg a, Reg b, TokType op, int label)
+{
+	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << "\n\t";
+
+	emit_jmp(op - OP_LE, label);
+
+	free_all();
+
+	return NOREG;
+}
+
+Reg logic_and_set(Reg a, AST *b)
+{
+	int second = label();
+	int end = label();
+
+	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
+	emit_jmp(Idx::NE, second);
+	out << "\txor " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
+	emit_jmp(Idx::UNCOND, end);
+
+	emit_lbl(second);
+	Reg rhs = gen_ast(b, NOREG, BINOP);
+	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
+	out << "\tmov $0, " << REGS[Quad][a] << '\n';
+	out << '\t' << CMP_SET[Idx::NE] << REGS[Byte][a] << '\n';
+
+	emit_lbl(end);
+
+	free_reg(rhs);
+	return a;
+}
+
+Reg logic_or_set(Reg a, AST *b)
+{
+	int second = label();
+	int end = label();
+
+	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
+	emit_jmp(Idx::EQ, second);
+	out << "\tmovq $1, " << REGS[Quad][a] << '\n';
+	emit_jmp(Idx::UNCOND, end);
+
+	emit_lbl(second);
+	Reg rhs = gen_ast(b, NOREG, BINOP);
+	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
+	out << "\tmov $0, " << REGS[Quad][a] << '\n';
+	out << '\t' << CMP_SET[Idx::NE] << REGS[Byte][a] << '\n';
+
+	emit_lbl(end);
+
+	free_reg(rhs);
+	return a;
+}
+
+Reg logic_and_jmp(Reg a, AST *b, int lbl)
+{
+}
+
+Reg logic_or_jmp(Reg a, AST *b, int lbl)
+{
+
+}
+
 void emit_func_hdr(int sym, int scopeid, int offset)
 {
 	Sym &s = Scope::s(scopeid)->syms[sym];
@@ -177,9 +268,9 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 		default: break;
 	}
 
-	Reg l, r;
-
 	// unary operations
+
+	Reg l;
 
 	if (n->lhs)
 		l = gen_ast(n->lhs, NOREG, n->type);
@@ -196,20 +287,31 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 		default: break;
 	}
 
+	if (n->op == OP_AND)
+		return logic_and_set(l, n->rhs);
+	else if (n->op == OP_OR)
+		return logic_or_set(l, n->rhs);
+
 	// binary operations
+
+	Reg r;
 
 	if (n->rhs)
 		r = gen_ast(n->rhs, l, n->type);
 	
 	switch (n->type) {
 		case BINOP:
-			if (n->op == '-' || n->op == OP_SHR || n->op == OP_SHL)
+			if (n->op == OP_SUB || n->op == OP_SHR || n->op == OP_SHL)
 				return emit_binop(r, l, n->op);
-			else if (n->op == '/' || n->op == '%')
+			else if (n->op == OP_DIV || n->op == OP_MOD)
 				return emit_div(l, r, n->op);
+			else if (n->op >= OP_LE && n->op <= OP_GT)
+				return cmp_set(l, r, n->op);
 			else
 				return emit_binop(l, r, n->op);
 	}
+
+	return NOREG;
 }
 
 void init_cg(const std::string &filename)

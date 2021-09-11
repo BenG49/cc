@@ -10,7 +10,7 @@
 
 #include <codegen.hpp>
 
-const int STR_TOK_LEN = IDENTIFIER - 256;
+const int STR_TOK_LEN = OP_LT - 1;
 
 const char *KEYWORDS[STR_TOK_LEN] = {
 #define DEF(type, str) str "\0",
@@ -26,7 +26,7 @@ const char *NAMES[TOK_COUNT - IDENTIFIER] = {
 	"string constant",
 };
 
-const char CHAR_TOKENS[] = ";=-+*/,[](){}&|%!~<>^.?:";
+const char CHAR_TOKENS[] = "<>;=-+*/,[](){}&|%!~^.?:";
 
 char esc_code(char c)
 {
@@ -80,7 +80,7 @@ Token Lexer::eat(TokType expected)
 	Token next = pnxt();
 	if (next.type != expected)
 	{
-		if (expected == ';')
+		if (expected == SEMI)
 			lex_err("Expected a \';\'");
 		else
 		{
@@ -311,21 +311,25 @@ Token Lexer::next()
 			if (keyword(KEYWORDS[i]))
 			{
 				int len = std::strlen(KEYWORDS[i]);
-				Token out(static_cast<TokType>(i + 256), line, col, len);
+				Token out(static_cast<TokType>(i + 1), line, col, len);
 				count(len);
 				return out;
 			}
 		}
 
 		// check single char constants
-		const char *ptr = CHAR_TOKENS;
-		while (*ptr)
-			if (cur == *ptr++)
+		int i = 0;
+		while (CHAR_TOKENS[i])
+		{
+			if (cur == CHAR_TOKENS[i])
 			{
-				Token out(static_cast<TokType>(cur), line, col, 1);
+				Token out(static_cast<TokType>(OP_LT + i), line, col, 1);
 				count(1);
 				return out;
 			}
+
+			++i;
+		}
 
 		// check for string constant
 		if (cur == '\"')
@@ -514,15 +518,15 @@ Token Lexer::peek(unsigned lookahead)
 
 const char *Lexer::getname(TokType t)
 {
-	if (t < 256)
+	if (t < OP_LT)
+		return KEYWORDS[t - 1];
+	else if (t < IDENTIFIER)
 	{
 		char *c = new char[2];
-		c[0] = static_cast<char>(t);
+		c[0] = CHAR_TOKENS[t - OP_LT];
 		c[1] = '\0';
 		return c;
 	}
-	else if (t < IDENTIFIER)
-		return KEYWORDS[t - 256];
 	else
 		return NAMES[t - IDENTIFIER];
 }

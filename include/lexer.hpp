@@ -49,10 +49,34 @@
 enum TokType
 {
 	TOK_EOF,
-	LAST_ASCII = 255,
 #define DEF(type, str) type,
 	TOKS
 #undef DEF
+	// single char constants
+	OP_LT,
+	OP_GT,
+	SEMI,
+	OP_SET,
+	OP_SUB,
+	OP_ADD,
+	OP_MUL,
+	OP_DIV,
+	COMMA,
+	LBRAC_SQ,
+	RBRAC_SQ,
+	LPAREN,
+	RPAREN,
+	LBRAC,
+	RBRAC,
+	OP_BIT_AND,
+	OP_BIT_OR,
+	OP_MOD,
+	OP_NOT,
+	OP_BIT_NOT,
+	OP_BIT_XOR,
+	DOT,
+	OP_COND,
+	OP_COLON,
 
 	IDENTIFIER,
 	INT_CONSTANT,

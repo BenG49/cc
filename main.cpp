@@ -135,6 +135,21 @@ int main(int argc, const char *argv[]) {
 	}
 
 	Lexer l(argv[1]);
+
+	/*TokType t = l.pnxt().type;
+	while (t) {
+		std::cout << "TOK " << t << ' ' << Lexer::getname(t);
+
+		if (t == INT_CONSTANT)
+			std::cout << ' ' << std::get<long long>(l.pnxt().val);
+		else if (t == STR_CONSTANT || t == IDENTIFIER)
+			std::cout << ' ' << std::get<std::string>(l.pnxt().val);
+		
+		std::cout << '\n';
+		l.eat(t);
+		t = l.pnxt().type;
+	}*/
+
 	Parser p(l);
 	AST *ast = p.parse();
 

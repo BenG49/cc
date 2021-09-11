@@ -44,21 +44,30 @@ Size getsize(TokType t);
 const Reg ARG_START = DI;
 const int SCRATCH_COUNT = 6;
 extern const char *REGS[4][COUNT];
-extern const char *MOV[4];
 
 void cg_err(const std::string &err);
 
 Reg alloc_reg();
 void free_reg(Reg reg);
 void free_all();
+int label();
 
 // -------- codegen -------- //
 
+Reg emit_jmp(int type, int lbl);
+void emit_lbl(int lbl);
 Reg emit_mov(Reg a, Reg b, Size s);
 Reg emit_int(int val);
 Reg emit_unop(Reg val, TokType op);
 Reg emit_binop(Reg src, Reg dst, TokType op);
 Reg emit_div(Reg src, Reg dst, TokType op);
+Reg cmp_set(Reg a, Reg b, TokType op);
+Reg cmp_jmp(Reg a, Reg b, TokType op, int lbl);
+Reg logic_and_set(Reg a, AST *b);
+Reg logic_or_set(Reg a, AST *b);
+Reg logic_and_jmp(Reg a, AST *b);
+Reg logic_or_jmp(Reg a, AST *b);
+
 void emit_func_hdr(int sym, int scopeid, int offset);
 void emit_epilogue();
 
