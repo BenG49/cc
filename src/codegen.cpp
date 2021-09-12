@@ -208,6 +208,8 @@ Reg emit_cond(AST *n)
 	// true block
 	r = gen_ast(n->mid, NOREG, COND);
 	emit_mov(r, out, Quad);
+	// jump past false block
+	emit_jmp(UNCOND, end);
 	free_all();
 
 	emit_lbl(_false);

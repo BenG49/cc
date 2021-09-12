@@ -11,6 +11,7 @@ main:
 	cmp %r12, %r11
 	jle L0
 	movq $4, %r10
+	jmp L1
 L0:
 	movq $5, %r10
 L1:
