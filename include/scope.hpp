@@ -18,6 +18,8 @@ struct Sym {
         : vtype(vtype), type(type), name(name), val(val) {}
 };
 
+struct AST;
+
 struct Scope {
     int parent_id;
     int id;
@@ -27,7 +29,7 @@ struct Scope {
     std::vector<Sym> syms;
 
     // entry, id
-    std::pair<int, int> get(const std::string &name);
+    AST *get(const std::string &name);
     bool in_scope(const std::string &name);
 
 

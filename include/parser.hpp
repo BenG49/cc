@@ -38,6 +38,8 @@ struct AST {
 	int val;
 	int scope_id;
 
+	Sym &get_sym() { return Scope::s(scope_id)->syms[val]; }
+
 	// appends to an "ast list"
 	// ordering: top down, left to right
 	static AST *append(AST *bottom, AST *node, NodeType t)

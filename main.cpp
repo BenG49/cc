@@ -126,10 +126,25 @@ void prettyprint(const AST *ast, int tabs)
 			break;
 		
 		case ASSIGN:
-			puts("=");
+			puts(Lexer::getname(ast->op));
 			
 			prettyprint(ast->lhs, tabs + 1);
 			prettyprint(ast->rhs, tabs + 1);
+
+			break;
+		
+		case FOR: case FOR_DECL:
+			puts("FOR");
+
+			prettyprint(ast->lhs, tabs + 1);
+			prettyprint(ast->mid, tabs + 1);
+			prettyprint(ast->rhs->lhs, tabs + 1);
+			prettyprint(ast->rhs->rhs, tabs + 1);
+			break;
+		
+		case POSTFIX:
+			printf("POST %s\n", Lexer::getname(ast->op));
+			prettyprint(ast->lhs, tabs + 1);
 
 			break;
 		
@@ -152,5 +167,5 @@ int main(int argc, const char *argv[]) {
 	// prettyprint(ast, 0);
 
 	init_cg("out.s");
-	gen_ast(ast, NOREG, NONE);
+	gen_ast(ast, Ctx(NOREG, NONE, 0, 0, 0));
 }

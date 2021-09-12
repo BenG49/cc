@@ -1,13 +1,14 @@
 #include <scope.hpp>
+#include <parser.hpp>
 
 int Scope::scope_count = 0;
 
-std::pair<int, int> Scope::get(const std::string &name)
+AST *Scope::get(const std::string &name)
 {
     for (unsigned i = 0; i < syms.size(); ++i)
     {
         if (syms[i].name == name)
-            return std::make_pair(i, id);
+            return new AST(i, id);
     }
 
     if (parent_id >= 0)

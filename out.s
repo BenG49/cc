@@ -2,17 +2,35 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	sub $12, %rsp
+	sub $8, %rsp
 	movq $0, %r10
 	movl %r10d, -4(%rbp)
-	movq $2, %r10
+	movq $0, %r10
 	movl %r10d, -8(%rbp)
-	movq $1, %r10
-	movl %r10d, -12(%rbp)
-	movl -12(%rbp), %r10d
-	movl %r10d, -8(%rbp)
-	add $4, %rsp
+L1:
+	movl -8(%rbp), %r11d
+	movq $10, %r12
+	cmp %r12, %r11
+	jg L3
 	movl -8(%rbp), %r10d
+	movq $5, %r11
+	cmp %r11, %r10
+	jne L4
+	jmp L3
+L4:
+	movl -8(%rbp), %r10d
+	movl -4(%rbp), %r11d
+	add %r11, %r10
+	movl %r10d, -4(%rbp)
+L2:
+	movl -8(%rbp), %r10d
+	inc %r10
+	movl %r10d, -8(%rbp)
+	dec %r10
+	jmp L1
+L3:
+	add $4, %rsp
+	movl -4(%rbp), %r10d
 	movl %r10d, %eax
 	mov %rbp, %rsp
 	pop %rbp
@@ -21,3 +39,4 @@ main:
 	mov %rbp, %rsp
 	pop %rbp
 	ret
+	add $538976288, %rsp

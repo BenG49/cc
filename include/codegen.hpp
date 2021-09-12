@@ -37,6 +37,26 @@ enum Reg {
 	NOREG
 };
 
+struct Ctx
+{
+	Reg reg;
+	NodeType parent;
+	int lbl;
+	int breaklbl;
+	int contlbl;
+
+	Ctx(Reg reg, NodeType parent, int lbl, int breaklbl, int contlbl)
+		: reg(reg), parent(parent), lbl(lbl), breaklbl(breaklbl), contlbl(contlbl) {}
+	Ctx(Ctx prev, NodeType parent)
+		: Ctx(NOREG, parent, 0, prev.breaklbl, prev.contlbl) {}
+	Ctx(Ctx prev, NodeType parent, Reg reg)
+		: Ctx(reg, parent, 0, prev.breaklbl, prev.contlbl) {}
+	Ctx(Ctx prev, NodeType parent, int lbl)
+		: Ctx(NOREG, parent, lbl, prev.breaklbl, prev.contlbl) {}
+	Ctx(NodeType parent, int breaklbl, int contlbl)
+		: Ctx(NOREG, parent, 0, breaklbl, contlbl) {}
+};
+
 enum Size { Byte, Word, Long, Quad };
 
 Size getsize(TokType t);
@@ -56,36 +76,46 @@ int label();
 
 // -------- codegen -------- //
 
+// etc
 Reg emit_jmp(int type, int lbl);
 void emit_lbl(int lbl);
 Reg emit_mov(Reg a, Reg b, Size s);
 Reg emit_int(int val);
 
+// computation
+Reg emit_post(Reg val, TokType op, const Sym &s);
 Reg emit_unop(Reg val, TokType op);
 Reg emit_binop(Reg src, Reg dst, TokType op);
-Reg emit_div(Reg src, Reg dst, TokType op);
+Reg emit_div(Reg dst, Reg src, TokType op);
 
+// comparison and jumps
 Reg cmp_set(Reg a, Reg b, TokType op);
 void cmp_jmp(Reg a, Reg b, TokType op, int lbl);
-Reg logic_and_set(Reg a, AST *b);
-Reg logic_or_set(Reg a, AST *b);
-void cond_jmp(AST *n, int lbl);
+Reg logic_and_set(Reg a, AST *b, Ctx c);
+Reg logic_or_set(Reg a, AST *b, Ctx c);
+void cond_jmp(AST *n, Ctx c);
 
+// variables
 Reg load_var(const Sym &s);
 Reg set_var(Reg r, const Sym &s);
 
+// stack and function management
 void stack_alloc(int offset);
 // size >= 0
 void stack_dealloc(int size);
-void emit_func_hdr(int sym, int scopeid, int offset);
+void emit_func_hdr(const Sym &s, int offset);
 void emit_epilogue();
 void emit_ret();
 
 // -------- gen -------- //
 	
 // reg = prev ast's output value
-Reg gen_ast(AST *n, Reg reg, NodeType parent, int lbl=0);
-void emit_if(AST *n);
-Reg emit_cond(AST *n);
+Reg gen_ast(AST *n, Ctx c);
+
+void emit_if(AST *n, Ctx c);
+Reg emit_cond(AST *n, Ctx c);
+void emit_while(AST *n, Ctx c);
+void emit_for(AST *n, Ctx c);
+void emit_do(AST *n, Ctx c);
 
 void init_cg(const std::string &filename);

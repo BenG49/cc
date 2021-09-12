@@ -222,8 +222,7 @@ AST *Parser::decl()
 	{
 		if (globl)
 		{
-			auto p = Scope::s(cur_scope)->get(name);
-			Sym &s = Scope::s(p.second)->syms[p.first];
+			Sym &s = Scope::s(cur_scope)->get(name)->get_sym();
 			if (s.vtype == V_FUNC)
 				parse_err("Redefinition of function " + name, id);
 			else if (assigned && s.vtype == V_GLOBL && s.val)
@@ -301,9 +300,13 @@ AST *Parser::for_stmt()
 	if (declaration)
 	{
 		cur_scope = Scope::new_scope(cur_scope);
-		out->val = cur_scope;
+		out->scope_id = cur_scope;
 
+		// kinda stupid, saves stack size
+		int tmp = stk_size;
 		out->lhs = decl();
+		out->val = stk_size - tmp;
+		stk_size = tmp;
 	}
 	else
 	{
@@ -418,8 +421,7 @@ AST *Parser::compound(bool newscope)
 // IDENTIFIER
 AST *Parser::lval()
 {
-	auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
-	return new AST(p.first, p.second);
+	return Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
 }
 
 // lval assign expr
@@ -560,11 +562,8 @@ AST *Parser::primary()
 		if (l.peek(2).type == LPAREN)
 			return call();
 		else
-		{
-			auto p = Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
 			// scope entry and scope id
-			return new AST(p.first, p.second);
-		}
+			return Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
 	}
 	else if (t == LPAREN)
 	{
@@ -587,10 +586,9 @@ AST *Parser::call()
 	// get symbol from scope
 	Token id = l.eat(IDENTIFIER);
 
-	auto p = Scope::s(cur_scope)->get(std::get<std::string>(id.val));
-	out->lhs = new AST(p.first, p.second);
+	out->lhs = Scope::s(cur_scope)->get(std::get<std::string>(id.val));
 
-	if (Scope::s(p.second)->syms[p.first].vtype != V_FUNC)
+	if (out->lhs->get_sym().vtype != V_FUNC)
 		parse_err("Attempting to call variable", id);
 
 	l.eat(LPAREN);
@@ -615,7 +613,7 @@ AST *Parser::call()
 	if (!t)
 		parse_err("Unclosed parentheses in function call", tok);
 	
-	if (param_count != Scope::s(p.second)->syms[p.first].val)
+	if (param_count != out->lhs->get_sym().val)
 		parse_err("Too many arguments to function call", tok);
 
 	l.eat(RPAREN);

@@ -42,7 +42,26 @@ Reg emit_int(int val)
 	return r;
 }
 
-// TODO: add inc and dec
+Reg emit_post(Reg val, TokType op, const Sym &s)
+{
+	if (op == OP_INC)
+		out << "\tinc " << REGS[Quad][val];
+	else if (op == OP_DEC)
+		out << "\tdec " << REGS[Quad][val];
+	out << '\n';
+
+	set_var(val, s);
+
+	// undo val
+	if (op == OP_INC)
+		out << "\tdec " << REGS[Quad][val];
+	else if (op == OP_DEC)
+		out << "\tinc " << REGS[Quad][val];
+	out << '\n';
+
+	return val;
+}
+
 Reg emit_unop(Reg val, TokType op)
 {
 	if (op == OP_NOT)
@@ -56,9 +75,12 @@ Reg emit_unop(Reg val, TokType op)
 	switch (op) {
 		case OP_SUB: out << "\tneg "; break;
 		case OP_BIT_NOT: out << "\tnot "; break;
+		case OP_INC: out << "\tinc "; break;
+		case OP_DEC: out << "\tdec "; break;
 	}
 
 	out << REGS[Quad][val] << '\n';
+
 	return val;
 }
 
@@ -69,13 +91,21 @@ Reg emit_binop(Reg src, Reg dst, TokType op)
 		src = emit_mov(src, C, Quad);
 
 	switch (op) {
+		case OP_ADD_SET:
 		case OP_ADD: out << "\tadd "; break;
+		case OP_SUB_SET:
 		case OP_SUB: out << "\tsub "; break;
+		case OP_MUL_SET:
 		case OP_MUL: out << "\timul "; break;
+		case OP_OR_SET:
 		case OP_BIT_OR: out << "\tor "; break;
+		case OP_AND_SET:
 		case OP_BIT_AND: out << "\tand "; break;
+		case OP_XOR_SET:
 		case OP_BIT_XOR: out << "\txor "; break;
+		case OP_SHR_SET:
 		case OP_SHR: out << "\tsar "; break;
+		case OP_SHL_SET:
 		case OP_SHL: out << "\tsal "; break;
 	}
 
@@ -86,13 +116,13 @@ Reg emit_binop(Reg src, Reg dst, TokType op)
 	return dst;
 }
 
-Reg emit_div(Reg src, Reg dst, TokType op)
+Reg emit_div(Reg dst, Reg src, TokType op)
 {
-	out << "\tmovq " << REGS[Quad][src] << ", %rax\n";
+	out << "\tmovq " << REGS[Quad][dst] << ", %rax\n";
 
-	out << "\tcqo\n\tidiv " << REGS[Quad][dst] << '\n';
+	out << "\tcqo\n\tidiv " << REGS[Quad][src] << '\n';
 
-	if (op == '/')
+	if (op == OP_DIV || op == OP_DIV_SET)
 		out << "\tmovq %rax, " << REGS[Quad][dst] << '\n';
 	else
 		out << "\tmovq %rdx, " << REGS[Quad][dst] << '\n';
@@ -122,7 +152,7 @@ void cmp_jmp(Reg a, Reg b, TokType op, int label)
 	free_all();
 }
 
-Reg logic_and_set(Reg a, AST *b)
+Reg logic_and_set(Reg a, AST *b, Ctx c)
 {
 	int second = label();
 	int end = label();
@@ -133,7 +163,7 @@ Reg logic_and_set(Reg a, AST *b)
 	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
-	Reg rhs = gen_ast(b, NOREG, BINOP);
+	Reg rhs = gen_ast(b, Ctx(c, BINOP));
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
 	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
@@ -144,7 +174,7 @@ Reg logic_and_set(Reg a, AST *b)
 	return a;
 }
 
-Reg logic_or_set(Reg a, AST *b)
+Reg logic_or_set(Reg a, AST *b, Ctx c)
 {
 	int second = label();
 	int end = label();
@@ -155,7 +185,7 @@ Reg logic_or_set(Reg a, AST *b)
 	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
-	Reg rhs = gen_ast(b, NOREG, BINOP);
+	Reg rhs = gen_ast(b, Ctx(c, BINOP));
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
 	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
@@ -166,14 +196,14 @@ Reg logic_or_set(Reg a, AST *b)
 	return a;
 }
 
-void cond_jmp(AST *n, int lbl)
+void cond_jmp(AST *n, Ctx c)
 {
-	Reg r = gen_ast(n, NOREG, IF, lbl);
+	Reg r = gen_ast(n, c);
 
 	if (n->type != BINOP || n->op < OP_LE || n->op > OP_GT)
 	{
 		out << "\ttest " << REGS[Quad][r] << ", " << REGS[Quad][r] << '\n';
-		out << '\t' << JMPS[NE] << 'L' << lbl << '\n';
+		out << '\t' << JMPS[NE] << 'L' << c.lbl << '\n';
 	}
 }
 
@@ -236,10 +266,8 @@ void stack_dealloc(int size)
 		out << "\tadd $" << size << ", %rsp\n";
 }
 
-void emit_func_hdr(int sym, int scopeid, int offset)
+void emit_func_hdr(const Sym &s, int offset)
 {
-	Sym &s = Scope::s(scopeid)->syms[sym];
-
 	out << ".globl " << s.name << '\n';
 	out << s.name << ":\n";
 	out << "\tpush %rbp\n\tmov %rsp, %rbp\n";

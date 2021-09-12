@@ -1,11 +1,10 @@
 int main() {
-    int a = 0;
-    int b = 2;
-
+    int sum = 0;
+    for (int i = 0; i <= 10; i++)
     {
-        int a = 1;
-        b = a;
+        if (i == 5)
+            break;
+        sum += i;
     }
-
-    return b;
+    return sum;
 }
