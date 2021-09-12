@@ -75,7 +75,8 @@ Reg load_var(const Sym &s);
 Reg set_var(Reg r, const Sym &s);
 
 void stack_alloc(int offset);
-void stack_dealloc(int offset);
+// size >= 0
+void stack_dealloc(int size);
 void emit_func_hdr(int sym, int scopeid, int offset);
 void emit_epilogue();
 void emit_ret();

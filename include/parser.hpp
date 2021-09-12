@@ -142,6 +142,7 @@ class Parser
 	// context
 	int cur_scope;
 	int offset;
+	int stk_size;
 	bool in_loop;
 
 	AST *expr();
@@ -184,6 +185,7 @@ public:
 		// create global scope
 		, cur_scope(Scope::new_scope(0))
 		, offset(0)
+		, stk_size(0)
 		, in_loop(false) {}
 
 	AST *parse();

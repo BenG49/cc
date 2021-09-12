@@ -236,7 +236,11 @@ AST *Parser::decl()
 	if (globl)
 		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, type, name));
 	else
-		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, (offset -= (1 << getsize(type)))));
+	{
+		int sz = 1 << getsize(type);
+		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, (offset -= sz)));
+		stk_size += sz;
+	}
 
 	if (assigned)
 	{
@@ -367,13 +371,16 @@ AST *Parser::do_stmt()
 }
 
 // '{' { stmt | decl } '}'
-// block stored in lhs
+// block stored in lhs, size stored in val
 AST *Parser::compound(bool newscope)
 {
+	stk_size = 0;
+
 	if (newscope)
 		cur_scope = Scope::new_scope(cur_scope);
 	
-	AST *out = new AST(LIST, cur_scope);
+	AST *out = new AST(LIST);
+	out->scope_id = cur_scope;
 	AST *bottom = out;
 
 	l.eat(LBRAC);
@@ -398,6 +405,10 @@ AST *Parser::compound(bool newscope)
 
 	// reset scope
 	cur_scope = Scope::s(cur_scope)->parent_id;
+
+	// aka not a function
+	if (newscope)
+		out->val = stk_size;
 
 	return out;
 }

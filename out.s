@@ -2,19 +2,17 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	sub $4, %rsp
+	sub $12, %rsp
 	movq $0, %r10
 	movl %r10d, -4(%rbp)
-	movl -4(%rbp), %r11d
-	movq $1, %r12
-	neg %r12
-	cmp %r12, %r11
-	jle L0
-	movq $4, %r10
-	jmp L1
-L0:
-	movq $5, %r10
-L1:
+	movq $2, %r10
+	movl %r10d, -8(%rbp)
+	movq $1, %r10
+	movl %r10d, -12(%rbp)
+	movl -12(%rbp), %r10d
+	movl %r10d, -8(%rbp)
+	add $4, %rsp
+	movl -8(%rbp), %r10d
 	movl %r10d, %eax
 	mov %rbp, %rsp
 	pop %rbp

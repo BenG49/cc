@@ -84,6 +84,11 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent, int lbl)
 					}
 				}
 			}
+
+			// end of list
+			if (n->val > 0)
+				stack_dealloc(n->val);
+
 			return NOREG;
 
 		case DECL:

@@ -230,12 +230,10 @@ void stack_alloc(int offset)
 		out << "\tadd $" << offset << ", %rsp\n";
 }
 
-void stack_dealloc(int offset)
+void stack_dealloc(int size)
 {
-	if (offset < 0)
-		out << "\tadd $" << (-offset) << ", %rsp\n";
-	else if (offset > 0)
-		out << "\tsub $" << offset << ", %rsp\n";
+	if (size)
+		out << "\tadd $" << size << ", %rsp\n";
 }
 
 void emit_func_hdr(int sym, int scopeid, int offset)
