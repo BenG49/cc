@@ -1,6 +1,4 @@
 int main() {
-    int a;
-    int b;
-    a = b = 4;
-    return a - b;
+    int a = 0;
+    return a > -1 ? 4 : 5;
 }

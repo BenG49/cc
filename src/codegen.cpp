@@ -24,7 +24,7 @@ const char *REGS[4][COUNT] = {
 
 const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
 const char *CMP_SET[6] = { "setle ", "setge ", "sete ", "setne ", "setl ", "setg " };
-const char *JMPS[7] = { "jle ", "jge ", "je ", "jne ", "jl ", "jg ", "jmp " };
+const char *JMPS[7] = { "jg ", "jl ", "jne ", "je ", "jge ", "jle ", "jmp " };
 
 enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
 
@@ -162,6 +162,65 @@ Reg emit_div(Reg src, Reg dst, TokType op)
 	return dst;
 }
 
+void emit_if(AST *n)
+{
+	int _false = label();
+	int end;
+
+	if (n->rhs)
+		end = label();
+
+	// if not cond, jump to false
+	cond_jmp(n->lhs, _false);
+	free_all();
+
+	// generate true block
+	gen_ast(n->mid, NOREG, IF);
+	free_all();
+
+	// jump to the end so that false block isn't executed
+	if (n->rhs)
+		emit_jmp(UNCOND, end);
+	
+	emit_lbl(_false);
+
+	if (n->rhs)
+	{
+		// generate else block
+		gen_ast(n->rhs, NOREG, IF);
+		free_all();
+		emit_lbl(end);
+	}
+}
+
+Reg emit_cond(AST *n)
+{
+	int _false = label();
+	int end = label();
+
+	Reg out = alloc_reg();
+	Reg r;
+
+	// if not cond, jump to false
+	cond_jmp(n->lhs, _false);
+	free_all();
+
+	// true block
+	r = gen_ast(n->mid, NOREG, COND);
+	emit_mov(r, out, Quad);
+	free_all();
+
+	emit_lbl(_false);
+
+	// false block
+	r = gen_ast(n->rhs, NOREG, COND);
+	emit_mov(r, out, Quad);
+
+	emit_lbl(end);
+
+	return out;
+}
+
 Reg cmp_set(Reg a, Reg b, TokType op)
 {
 	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << '\n';
@@ -173,15 +232,13 @@ Reg cmp_set(Reg a, Reg b, TokType op)
 	return a;
 }
 
-Reg cmp_jmp(Reg a, Reg b, TokType op, int label)
+void cmp_jmp(Reg a, Reg b, TokType op, int label)
 {
-	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << "\n\t";
+	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << '\n';
 
 	emit_jmp(op - OP_LE, label);
 
 	free_all();
-
-	return NOREG;
 }
 
 Reg logic_and_set(Reg a, AST *b)
@@ -190,15 +247,15 @@ Reg logic_and_set(Reg a, AST *b)
 	int end = label();
 
 	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
-	emit_jmp(Idx::NE, second);
+	emit_jmp(NE, second);
 	out << "\txor " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
-	emit_jmp(Idx::UNCOND, end);
+	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
 	Reg rhs = gen_ast(b, NOREG, BINOP);
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
-	out << '\t' << CMP_SET[Idx::NE] << REGS[Byte][a] << '\n';
+	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
 
 	emit_lbl(end);
 
@@ -212,15 +269,15 @@ Reg logic_or_set(Reg a, AST *b)
 	int end = label();
 
 	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
-	emit_jmp(Idx::EQ, second);
+	emit_jmp(EQ, second);
 	out << "\tmovq $1, " << REGS[Quad][a] << '\n';
-	emit_jmp(Idx::UNCOND, end);
+	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
 	Reg rhs = gen_ast(b, NOREG, BINOP);
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
-	out << '\t' << CMP_SET[Idx::NE] << REGS[Byte][a] << '\n';
+	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
 
 	emit_lbl(end);
 
@@ -237,7 +294,16 @@ Reg logic_or_jmp(Reg a, AST *b, int lbl)
 
 }
 
+void cond_jmp(AST *n, int lbl)
+{
+	Reg r = gen_ast(n, NOREG, IF, lbl);
 
+	if (n->type != BINOP || n->op < OP_LE || n->op > OP_GT)
+	{
+		out << "\ttest " << REGS[Quad][r] << ", " << REGS[Quad][r] << '\n';
+		out << '\t' << JMPS[NE] << 'L' << lbl << '\n';
+	}
+}
 
 Reg load_var(const Sym &s)
 {
@@ -284,8 +350,6 @@ Reg set_var(Reg r, const Sym &s)
 	return r;
 }
 
-
-
 void emit_func_hdr(int sym, int scopeid, int offset)
 {
 	Sym &s = Scope::s(scopeid)->syms[sym];
@@ -304,7 +368,7 @@ void emit_epilogue() { out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n"; }
 
 // -------- gen -------- //
 
-Reg gen_ast(AST *n, Reg reg, NodeType parent)
+Reg gen_ast(AST *n, Reg reg, NodeType parent, int lbl)
 {
 	switch (n->type) {
 		case FUNC:
@@ -313,15 +377,18 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 			out << "\txor %rax, %rax\n";
 			emit_epilogue();
 			return NOREG;
-		case CONST:
-			return emit_int(n->val);
 		case LIST:
 			if (n->lhs) {
 				gen_ast(n->lhs, NOREG, LIST);
+				free_all();
 				if (n->mid) {
 					gen_ast(n->mid, NOREG, LIST);
+					free_all();
 					if (n->rhs)
+					{
 						gen_ast(n->rhs, NOREG, LIST);
+						free_all();
+					}
 				}
 			}
 			return NOREG;
@@ -336,27 +403,51 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 			}
 			return NOREG;
 
-		case VAR: {
-			Sym &s = Scope::s(n->scope_id)->syms[n->val];
+		case IF:
+			emit_if(n);
+			return NOREG;
 
-			if (parent == DECL || (parent == ASSIGN && reg != NOREG))
-				return set_var(reg, s);
-			// not assigning
-			else
-				return load_var(s);
-		}
+		case COND:
+			return emit_cond(n);
 
 		default: break;
 	}
 
-	// unary operations
-
-	Reg l;
+	Reg l, r;
 
 	if (n->lhs)
 		l = gen_ast(n->lhs, NOREG, n->type);
+
+	if (n->op == OP_AND)
+		return logic_and_set(l, n->rhs);
+	else if (n->op == OP_OR)
+		return logic_or_set(l, n->rhs);
+
+	if (n->rhs)
+		r = gen_ast(n->rhs, l, n->type);
 	
 	switch (n->type) {
+		case CONST:
+			return emit_int(n->val);
+
+		case BINOP:
+			if (n->op == OP_SUB || n->op == OP_SHR || n->op == OP_SHL)
+				return emit_binop(r, l, n->op);
+			else if (n->op == OP_DIV || n->op == OP_MOD)
+				return emit_div(l, r, n->op);
+			else if (n->op >= OP_LE && n->op <= OP_GT)
+			{
+				if (parent == IF)
+				{
+					cmp_jmp(l, r, n->op, lbl);
+					return NOREG;
+				}
+				else
+					return cmp_set(l, r, n->op);
+			}
+			else
+				return emit_binop(l, r, n->op);
+
 		case UNOP:
 			return emit_unop(l, n->op);
 
@@ -366,31 +457,15 @@ Reg gen_ast(AST *n, Reg reg, NodeType parent)
 			free_all();
 			return NOREG;
 
-		default: break;
-	}
+		case VAR: {
+			Sym &s = Scope::s(n->scope_id)->syms[n->val];
 
-	if (n->op == OP_AND)
-		return logic_and_set(l, n->rhs);
-	else if (n->op == OP_OR)
-		return logic_or_set(l, n->rhs);
-
-	// binary operations
-
-	Reg r;
-
-	if (n->rhs)
-		r = gen_ast(n->rhs, l, n->type);
-	
-	switch (n->type) {
-		case BINOP:
-			if (n->op == OP_SUB || n->op == OP_SHR || n->op == OP_SHL)
-				return emit_binop(r, l, n->op);
-			else if (n->op == OP_DIV || n->op == OP_MOD)
-				return emit_div(l, r, n->op);
-			else if (n->op >= OP_LE && n->op <= OP_GT)
-				return cmp_set(l, r, n->op);
+			if (parent == DECL || (parent == ASSIGN && reg != NOREG))
+				return set_var(reg, s);
+			// not assigning
 			else
-				return emit_binop(l, r, n->op);
+				return load_var(s);
+		}
 	}
 
 	return NOREG;
