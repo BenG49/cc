@@ -39,8 +39,8 @@
 	DEF(OP_INC, "++")             \
 	DEF(OP_DEC, "--")             \
 	DEF(OP_PTR, "->")             \
-	DEF(OP_AND, "&&")             \
-	DEF(OP_OR, "||")              \
+	DEF(OP_LOGAND, "&&")          \
+	DEF(OP_LOGOR, "||")           \
 	DEF(OP_LE, "<=")              \
 	DEF(OP_GE, ">=")              \
 	DEF(OP_EQ, "==")              \
@@ -68,12 +68,12 @@ enum TokType
 	RPAREN,
 	LBRAC,
 	RBRAC,
-	OP_BIT_AND,
-	OP_BIT_OR,
+	OP_AMPER,
+	OP_OR,
 	OP_MOD,
+	OP_LOGNOT,
 	OP_NOT,
-	OP_BIT_NOT,
-	OP_BIT_XOR,
+	OP_XOR,
 	DOT,
 	OP_COND,
 	OP_COLON,

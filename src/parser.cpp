@@ -479,19 +479,19 @@ AST *Parser::cond()
 }
 
 // op_and { '||' op_and }
-BINEXP(op_or, op_and, t == OP_OR)
+BINEXP(op_or, op_and, t == OP_LOGOR)
 
 // bitwise_or { '&&' bitwise_or }
-BINEXP(op_and, bitwise_or, t == OP_AND)
+BINEXP(op_and, bitwise_or, t == OP_LOGAND)
 
 // bitwise_xor { '|' bitwise_xor }
-BINEXP(bitwise_or, bitwise_xor, t == OP_BIT_OR)
+BINEXP(bitwise_or, bitwise_xor, t == OP_OR)
 
 // bitwise_and { '^' bitwise_and }
-BINEXP(bitwise_xor, bitwise_and, t == OP_BIT_XOR)
+BINEXP(bitwise_xor, bitwise_and, t == OP_XOR)
 
 // equality { '&' equality }
-BINEXP(bitwise_and, equality, t == OP_BIT_AND)
+BINEXP(bitwise_and, equality, t == OP_AMPER)
 
 // comparison { ( OP_EQ | OP_NE ) comparison }
 BINEXP(equality, comparison, t == OP_EQ || t == OP_NE)
@@ -513,13 +513,13 @@ BINEXP(factor, unop, t == OP_DIV || t == OP_MUL || t == OP_MOD)
 AST *Parser::unop()
 {
 	TokType t = l.pnxt().type;
-	if (t == OP_INC || t == OP_DEC || t == OP_BIT_AND || t == OP_MUL)
+	if (t == OP_INC || t == OP_DEC || t == OP_AMPER || t == OP_MUL)
 	{
 		l.eat(t);
 
 		return new AST(UNOP, t, lval());
 	}
-	else if (t == OP_NOT || t == OP_BIT_NOT || t == OP_SUB)
+	else if (t == OP_LOGNOT || t == OP_NOT || t == OP_SUB)
 	{
 		l.eat(t);
 

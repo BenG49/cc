@@ -80,7 +80,7 @@ Reg emit_post(Reg val, TokType op, const Sym &s)
 
 Reg emit_unop(Reg val, TokType op)
 {
-	if (op == OP_NOT)
+	if (op == OP_LOGNOT)
 	{
 		out << "\ttest " << REGS[Quad][val] << ", " << REGS[Quad][val] << '\n';
 		out << "\tmovq $0, " << REGS[Quad][val] << '\n';
@@ -90,7 +90,7 @@ Reg emit_unop(Reg val, TokType op)
 
 	switch (op) {
 		case OP_SUB: out << "\tneg "; break;
-		case OP_BIT_NOT: out << "\tnot "; break;
+		case OP_NOT: out << "\tnot "; break;
 		case OP_INC: out << "\tinc "; break;
 		case OP_DEC: out << "\tdec "; break;
 	}
@@ -115,11 +115,11 @@ Reg emit_binop(Reg src, Reg dst, TokType op)
 		case OP_MUL_SET:
 		case OP_MUL: out << "\timul "; break;
 		case OP_OR_SET:
-		case OP_BIT_OR: out << "\tor "; break;
+		case OP_OR: out << "\tor "; break;
 		case OP_AND_SET:
-		case OP_BIT_AND: out << "\tand "; break;
+		case OP_AMPER: out << "\tand "; break;
 		case OP_XOR_SET:
-		case OP_BIT_XOR: out << "\txor "; break;
+		case OP_XOR: out << "\txor "; break;
 		case OP_SHR_SET:
 		case OP_SHR: out << "\tsar "; break;
 		case OP_SHL_SET:

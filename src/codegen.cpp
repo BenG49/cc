@@ -155,9 +155,9 @@ Reg gen_ast(AST *n, Ctx c)
 	if (n->lhs)
 		l = gen_ast(n->lhs, Ctx(c, n->type));
 
-	if (n->op == OP_AND)
+	if (n->op == OP_LOGAND)
 		return logic_and_set(l, n->rhs, c);
-	else if (n->op == OP_OR)
+	else if (n->op == OP_LOGOR)
 		return logic_or_set(l, n->rhs, c);
 
 	if (n->rhs)
