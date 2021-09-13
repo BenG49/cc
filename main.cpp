@@ -148,6 +148,11 @@ void prettyprint(const AST *ast, int tabs)
 
 			break;
 		
+		case CALL:
+			printf("CALL FUNC %s\n", ast->lhs->get_sym().name.c_str());
+			prettyprint(ast->rhs, tabs + 1);
+			break;
+		
 		default: printf("megacringe %d\n", ast->type); break;
 	};
 }

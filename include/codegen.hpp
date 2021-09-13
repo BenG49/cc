@@ -9,33 +9,34 @@
 
 enum Reg {
 	// scratch regs
-	R10,
-	R11,
-	R12,
-	R13,
-	R14,
-	R15,
+	R0,
+	R1,
+	R2,
+	R3,
+	R4,
+	R5,
 
 	// stack regs
-	DI,
-	SI,
-	D,
-	C,
-	R8,
-	R9,
-
-	// etc
-	A,
-	B,
-
-	// pointer regs
-	BP,
-	SP,
-	IP, 
+	A0,
+	A1,
+	A2,
+	A3,
+	A4,
+	A5,
+	// return reg
+	RR,
 
 	COUNT,
 	NOREG
 };
+
+enum Size { Byte, Word, Long, Quad };
+enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
+
+Size getsize(TokType t);
+
+const int SCRATCH_COUNT = 6;
+extern const char *REGS[4][COUNT];
 
 struct Ctx
 {
@@ -57,16 +58,6 @@ struct Ctx
 		: Ctx(NOREG, parent, 0, breaklbl, contlbl) {}
 };
 
-enum Size { Byte, Word, Long, Quad };
-
-Size getsize(TokType t);
-
-const Reg ARG_START = DI;
-const int SCRATCH_COUNT = 6;
-extern const char *REGS[4][COUNT];
-
-enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
-
 void cg_err(const std::string &err);
 
 Reg alloc_reg();
@@ -79,8 +70,11 @@ int label();
 // etc
 Reg emit_jmp(int type, int lbl);
 void emit_lbl(int lbl);
-Reg emit_mov(Reg a, Reg b, Size s);
+Reg emit_mov(Reg src, Reg dst, Size s);
+void emit_mov(Reg src, int offset, Size s);
 Reg emit_int(int val);
+void emit_push(Reg r);
+void emit_pop(Reg r);
 
 // computation
 Reg emit_post(Reg val, TokType op, const Sym &s);
@@ -94,6 +88,7 @@ void cmp_jmp(Reg a, Reg b, TokType op, int lbl);
 Reg logic_and_set(Reg a, AST *b, Ctx c);
 Reg logic_or_set(Reg a, AST *b, Ctx c);
 void cond_jmp(AST *n, Ctx c);
+void emit_call(const std::string &name);
 
 // variables
 Reg load_var(const Sym &s);
@@ -105,17 +100,18 @@ void stack_alloc(int offset);
 void stack_dealloc(int size);
 void emit_func_hdr(const Sym &s, int offset);
 void emit_epilogue();
-void emit_ret();
+void emit_ret(Reg r, Size s);
 
 // -------- gen -------- //
 	
 // reg = prev ast's output value
 Reg gen_ast(AST *n, Ctx c);
 
-void emit_if(AST *n, Ctx c);
-Reg emit_cond(AST *n, Ctx c);
-void emit_while(AST *n, Ctx c);
-void emit_for(AST *n, Ctx c);
-void emit_do(AST *n, Ctx c);
+void gen_if(AST *n, Ctx c);
+Reg gen_cond(AST *n, Ctx c);
+void gen_while(AST *n, Ctx c);
+void gen_for(AST *n, Ctx c);
+void gen_do(AST *n, Ctx c);
+Reg gen_call(AST *n, Ctx c);
 
 void init_cg(const std::string &filename);

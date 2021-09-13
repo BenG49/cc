@@ -1,10 +1,7 @@
+int sum(int a, int b) {
+    return a + b;
+}
+
 int main() {
-    int sum = 0;
-    for (int i = 0; i <= 10; i++)
-    {
-        if (i == 5)
-            break;
-        sum += i;
-    }
-    return sum;
+    return sum(1, 2) - (sum(1, 2) / 2) * 2;
 }

@@ -3,10 +3,10 @@
 // -------- codegen -------- //
 
 const char *REGS[4][COUNT] = {
-	{ "%r10b", "%r11b", "%r12b", "%r13b", "%r14b", "%r15b", "%dil", "%sil", "%dl",  "%cl",  "%r8l", "%r9l", "%al",  "%bl",  "%bpl", "%spl", "%ip" }, // 8
-	{ "%r10w", "%r11w", "%r12w", "%r13w", "%r14w", "%r15w", "%di",  "%si",  "%dx",  "%cx",  "%r8w", "%r9w", "%ax",  "%bx",  "%bp",  "%sp",  "%ip" }, // 16
-	{ "%r10d", "%r11d", "%r12d", "%r13d", "%r14d", "%r15d", "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d", "%eax", "%ebx", "%ebp", "%esp", "%eip" }, // 32
-	{ "%r10",  "%r11",  "%r12",  "%r13",  "%r14",  "%r15",  "%rdi", "%rsi", "%rdx", "%rcx", "%r8",  "%r9",  "%rax", "%rbx", "%rbp", "%rsp", "%rip" }, // 64
+	{ "%r10b", "%r11b", "%r12b", "%r13b", "%r14b", "%r15b", "%dil", "%sil", "%dl",  "%cl",  "%r8l", "%r9l", "%al"  }, // 8
+	{ "%r10w", "%r11w", "%r12w", "%r13w", "%r14w", "%r15w", "%di",  "%si",  "%dx",  "%cx",  "%r8w", "%r9w", "%ax"  }, // 16
+	{ "%r10d", "%r11d", "%r12d", "%r13d", "%r14d", "%r15d", "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d", "%eax" }, // 32
+	{ "%r10",  "%r11",  "%r12",  "%r13",  "%r14",  "%r15",  "%rdi", "%rsi", "%rdx", "%rcx", "%r8",  "%r9",  "%rax" }, // 64
 };
 
 const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
@@ -27,12 +27,17 @@ void emit_lbl(int lbl)
 
 Reg emit_mov(Reg src, Reg dst, Size s)
 {
-	if (src == dst)
-		return src;
-
 	out << '\t' << MOV[s] << REGS[s][src] << ", " << REGS[s][dst] << '\n';
-	free_reg(src);
+	if (src < SCRATCH_COUNT) free_reg(src);
 	return dst;
+}
+
+void emit_mov(Reg src, int offset, Size s)
+{
+	out << '\t' << MOV[s] << REGS[s][src] << ", ";
+
+	if (offset) out << offset;
+	out << "(%rbp)\n";
 }
 
 Reg emit_int(int val)
@@ -40,6 +45,16 @@ Reg emit_int(int val)
 	Reg r = alloc_reg();
 	out << "\tmovq $" << val << ", " << REGS[Quad][r] << '\n';
 	return r;
+}
+
+void emit_push(Reg r)
+{
+	out << "\tpush " << REGS[Quad][r] << '\n';
+}
+
+void emit_pop(Reg r)
+{
+	out << "\tpop " << REGS[Quad][r] << '\n';
 }
 
 Reg emit_post(Reg val, TokType op, const Sym &s)
@@ -88,7 +103,8 @@ Reg emit_unop(Reg val, TokType op)
 Reg emit_binop(Reg src, Reg dst, TokType op)
 {
 	if (op == OP_SHR || op == OP_SHL)
-		src = emit_mov(src, C, Quad);
+		// arg 3 = rcx
+		src = emit_mov(src, A3, Quad);
 
 	switch (op) {
 		case OP_ADD_SET:
@@ -207,6 +223,11 @@ void cond_jmp(AST *n, Ctx c)
 	}
 }
 
+void emit_call(const std::string &name)
+{
+	out << "\tcall " << name << '\n';
+}
+
 Reg load_var(const Sym &s)
 {
 	Reg r = alloc_reg();
@@ -223,6 +244,10 @@ Reg load_var(const Sym &s)
 
 		case V_GLOBL:
 			out << s.name << "(%rip), ";
+			break;
+		
+		case V_REG:
+			out << REGS[sz][s.val] << ", ";
 			break;
 	}
 
@@ -245,10 +270,13 @@ Reg set_var(Reg r, const Sym &s)
 		case V_GLOBL:
 			out << s.name << "(%rip)";
 			break;
+
+		case V_REG:
+			out << REGS[sz][s.val];
+			break;
 	}
 
 	out << '\n';
-
 	return r;
 }
 
@@ -280,8 +308,10 @@ void emit_epilogue()
     out << "\txor %rax, %rax\n\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 
-void emit_ret()
+void emit_ret(Reg r, Size s)
 {
+	if (r != RR)
+		out << '\t' << MOV[s] << REGS[s][r] << ", " << REGS[s][RR] << '\n';
     out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 

@@ -143,7 +143,7 @@ AST *Parser::func()
 		if (param_count < 6)
 			cur->syms.push_back(Sym(V_REG, t,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
-				ARG_START + param_count));
+				SCRATCH_COUNT + param_count));
 		else
 			cur->syms.push_back(Sym(V_VAR, t,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
@@ -578,6 +578,7 @@ AST *Parser::primary()
 }
 
 // IDENTIFIER '(' [ expr { ',' expr } ] ')'
+// lhs = var, rhs = params
 AST *Parser::call()
 {
 	AST *out = new AST(CALL);

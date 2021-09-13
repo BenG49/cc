@@ -66,9 +66,12 @@ Reg gen_ast(AST *n, Ctx c)
 {
 	switch (n->type) {
 		case FUNC:
-			emit_func_hdr(n->lhs->get_sym(), n->val);
-			gen_ast(n->rhs, Ctx(c, n->type));
-			emit_epilogue();
+			if (n->rhs)
+			{
+				emit_func_hdr(n->lhs->get_sym(), n->val);
+				gen_ast(n->rhs, Ctx(c, n->type));
+				emit_epilogue();
+			}
 			return NOREG;
 		case LIST:
 			if (n->lhs) {
@@ -117,19 +120,19 @@ Reg gen_ast(AST *n, Ctx c)
 		}
 
 		case IF:
-			emit_if(n, c);
+			gen_if(n, c);
 			return NOREG;
 		case COND:
-			return emit_cond(n, c);
+			return gen_cond(n, c);
 		case FOR:
 		case FOR_DECL:
-			emit_for(n, c);
+			gen_for(n, c);
 			return NOREG;
 		case WHILE:
-			emit_while(n, c);
+			gen_while(n, c);
 			return NOREG;
 		case DO:
-			emit_do(n, c);
+			gen_do(n, c);
 			return NOREG;
 		case BREAK:
 			emit_jmp(UNCOND, c.breaklbl);
@@ -137,6 +140,8 @@ Reg gen_ast(AST *n, Ctx c)
 		case CONT:
 			emit_jmp(UNCOND, c.contlbl);
 			return NOREG;
+		case CALL:
+			return gen_call(n, c);
 
 		default: break;
 	}
@@ -190,8 +195,7 @@ Reg gen_ast(AST *n, Ctx c)
 			return emit_post(l, n->op, n->lhs->get_sym());
 
 		case RET:
-			emit_mov(l, A, getsize(n->lhs->get_sym().type));
-			emit_ret();
+			emit_ret(l, getsize(n->lhs->get_sym().type));
 			free_all();
 			return NOREG;
 
@@ -209,7 +213,7 @@ Reg gen_ast(AST *n, Ctx c)
 	return NOREG;
 }
 
-void emit_if(AST *n, Ctx c)
+void gen_if(AST *n, Ctx c)
 {
 	int _false = label();
 	int end;
@@ -240,7 +244,7 @@ void emit_if(AST *n, Ctx c)
 	}
 }
 
-Reg emit_cond(AST *n, Ctx c)
+Reg gen_cond(AST *n, Ctx c)
 {
 	int _false = label();
 	int end = label();
@@ -270,7 +274,7 @@ Reg emit_cond(AST *n, Ctx c)
 	return out;
 }
 
-void emit_while(AST *n, Ctx c)
+void gen_while(AST *n, Ctx c)
 {
 	int start = label();
 	int end = label();
@@ -287,7 +291,7 @@ void emit_while(AST *n, Ctx c)
 	emit_lbl(end);
 }
 
-void emit_for(AST *n, Ctx c)
+void gen_for(AST *n, Ctx c)
 {
 	int start = label();
 	int post = label();
@@ -318,7 +322,7 @@ void emit_for(AST *n, Ctx c)
 	stack_dealloc(n->val);
 }
 
-void emit_do(AST *n, Ctx c)
+void gen_do(AST *n, Ctx c)
 {
 	int start = label();
 	int end = label();
@@ -334,4 +338,43 @@ void emit_do(AST *n, Ctx c)
 	emit_jmp(UNCOND, start);
 
 	emit_lbl(end);
+}
+
+Reg gen_call(AST *n, Ctx c)
+{
+	ASTIter i(n->rhs);
+
+	int offset = 0;
+	int count = 0;
+	while (i.has_next())
+	{
+		Reg r = gen_ast(i.next(), Ctx(c, CALL));
+
+		if (count < 6)
+		{
+			Reg arg = static_cast<Reg>(SCRATCH_COUNT + count);
+			emit_push(arg);
+			emit_mov(r, arg, Quad);
+		}
+		else
+			emit_mov(r, (offset -= 8), Quad);
+		
+		++count;
+	}
+
+	if (count > 6)
+		stack_alloc(offset);
+	
+	emit_call(n->lhs->get_sym().name);
+
+	if (count > 6)
+		stack_dealloc(-offset);
+	
+	// pop saved regs
+	for (int i = std::min(5, count - 1); i >= 0; --i)
+		emit_pop(static_cast<Reg>(SCRATCH_COUNT + i));
+	
+	Reg out = alloc_reg();
+
+	return emit_mov(RR, out, Quad);
 }
