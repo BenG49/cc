@@ -243,6 +243,7 @@ AST *Parser::decl()
 
 	if (assigned)
 	{
+		// use val to store if assigned or not
 		if (globl)
 			Scope::s(cur_scope)->syms.back().val = true;
 

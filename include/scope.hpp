@@ -13,7 +13,7 @@ struct Sym {
     int val;
 
     Sym(VarType vtype, TokType type, const std::string &name)
-        : vtype(vtype), type(type), name(name) {}
+        : vtype(vtype), type(type), name(name), val(0) {}
     Sym(VarType vtype, TokType type, const std::string &name, int val)
         : vtype(vtype), type(type), name(name), val(val) {}
 };

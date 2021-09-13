@@ -10,6 +10,7 @@ const char *REGS[4][COUNT] = {
 };
 
 const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
+const char *GLOBL_ALLOC[4] = { ".byte ", ".word ", ".long ", ".quad " };
 const char *CMP_SET[6] = { "setle ", "setge ", "sete ", "setne ", "setl ", "setg " };
 const char *JMPS[7] = { "jg ", "jl ", "jne ", "je ", "jge ", "jle ", "jmp " };
 
@@ -280,6 +281,22 @@ Reg set_var(Reg r, const Sym &s)
 	return r;
 }
 
+void gen_globls()
+{
+	out << ".data\n";
+
+	for (auto p : globls)
+	{
+		out << p.first.name << ": ";
+
+		// initialized var
+		if (!p.second)
+			out << ".zero " << (1 << getsize(p.first.type)) << '\n';
+		else
+			out << GLOBL_ALLOC[getsize(p.first.type)] << ' ' << p.second->val << '\n';
+	}
+}
+
 void stack_alloc(int offset)
 {
 	if (offset < 0)
@@ -314,7 +331,6 @@ void emit_ret(Reg r, Size s)
 		out << '\t' << MOV[s] << REGS[s][r] << ", " << REGS[s][RR] << '\n';
     out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
-
 
 void init_cg(const std::string &filename)
 {

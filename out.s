@@ -90,4 +90,4 @@ main:
 	mov %rbp, %rsp
 	pop %rbp
 	ret
-	add $1918986339, %rsp
+.data

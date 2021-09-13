@@ -6,6 +6,7 @@
 #include <string>
 
 #include <parser.hpp>
+#include <scope.hpp>
 
 enum Reg {
 	// scratch regs
@@ -37,6 +38,7 @@ Size getsize(TokType t);
 
 const int SCRATCH_COUNT = 6;
 extern const char *REGS[4][COUNT];
+extern std::vector<std::pair<Sym, AST*>> globls;
 
 struct Ctx
 {
@@ -93,6 +95,7 @@ void emit_call(const std::string &name);
 // variables
 Reg load_var(const Sym &s);
 Reg set_var(Reg r, const Sym &s);
+void gen_globls();
 
 // stack and function management
 void stack_alloc(int offset);
@@ -106,6 +109,8 @@ void emit_ret(Reg r, Size s);
 	
 // reg = prev ast's output value
 Reg gen_ast(AST *n, Ctx c);
+
+void add_globl(const Sym &s, AST *val);
 
 void gen_if(AST *n, Ctx c);
 Reg gen_cond(AST *n, Ctx c);

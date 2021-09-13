@@ -1,10 +1,9 @@
 #include <codegen.hpp>
 #include <parser.hpp>
 
-#include <scope.hpp>
-
 // true=free, false=allocated
 bool free_regs[SCRATCH_COUNT] = { true };
+std::vector<std::pair<Sym, AST *>> globls;
 
 Size getsize(TokType t)
 {
@@ -95,6 +94,11 @@ Reg gen_ast(AST *n, Ctx c)
 			return NOREG;
 
 		case DECL:
+			if (n->lhs->get_sym().vtype == V_GLOBL)
+			{
+				add_globl(n->lhs->get_sym(), n->rhs);
+				return NOREG;
+			}
 		case ASSIGN: {
 			if (!n->rhs)
 				return NOREG;
@@ -211,6 +215,30 @@ Reg gen_ast(AST *n, Ctx c)
 	}
 
 	return NOREG;
+}
+
+void add_globl(const Sym &s, AST *val)
+{
+	if (val && val->type != CONST)
+		cg_err("Global must be initialized with constant");
+	
+	for (unsigned i = 0; i < globls.size(); ++i)
+		// forward global declaration
+		if (globls[i].first.name == s.name)
+		{
+			// has already been forward declared
+			if (val && !globls[i].second)
+			{
+				// replace
+				globls[i].second = val;
+				return;
+			}
+			// forward declaration after instantiation
+			else if (!val)
+				return;
+		}
+
+	globls.push_back(std::make_pair(s, val));
 }
 
 void gen_if(AST *n, Ctx c)

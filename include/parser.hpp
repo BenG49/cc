@@ -67,7 +67,7 @@ struct AST {
 
 	// generic constructors
 	AST(NodeType type, AST *lhs, AST *mid, AST *rhs)
-		: type(type), lhs(lhs), mid(mid), rhs(rhs) {}
+		: type(type), lhs(lhs), mid(mid), rhs(rhs), val(0) {}
 
 	AST(NodeType type, AST *lhs, AST *rhs)
 		: type(type), lhs(lhs), mid(nullptr), rhs(rhs) {}

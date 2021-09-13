@@ -173,4 +173,5 @@ int main(int argc, const char *argv[]) {
 
 	init_cg("out.s");
 	gen_ast(ast, Ctx(NOREG, NONE, 0, 0, 0));
+	gen_globls();
 }
