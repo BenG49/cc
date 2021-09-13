@@ -342,6 +342,15 @@ void gen_do(AST *n, Ctx c)
 
 Reg gen_call(AST *n, Ctx c)
 {
+	bool pushed_regs[6] = {0};
+	// push registers in use
+	for (int i = 0; i < SCRATCH_COUNT; ++i)
+		if (!free_regs[i])
+		{
+			emit_push(static_cast<Reg>(i));
+			pushed_regs[i] = true;
+		}
+
 	ASTIter i(n->rhs);
 
 	int offset = 0;
@@ -373,6 +382,11 @@ Reg gen_call(AST *n, Ctx c)
 	// pop saved regs
 	for (int i = std::min(5, count - 1); i >= 0; --i)
 		emit_pop(static_cast<Reg>(SCRATCH_COUNT + i));
+
+	// pop prev saved regs
+	for (int i = SCRATCH_COUNT - 1; i >= 0; --i)
+		if (pushed_regs[i])
+			emit_pop(static_cast<Reg>(i));
 	
 	Reg out = alloc_reg();
 

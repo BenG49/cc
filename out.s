@@ -1,36 +1,93 @@
-.globl sum
-sum:
-	push %rbp
-	mov %rsp, %rbp
-	movl %edi, %r10d
-	movl %esi, %eax
-	add %r10, %rax
-	mov %rbp, %rsp
-	pop %rbp
-	ret
 .globl main
 main:
 	push %rbp
 	mov %rsp, %rbp
-	movq $1, %rdi
-	movq $2, %rsi
-	call sum
+	movq $72, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
 	movq %rax, %r10
-	movq $1, %rdi
-	movq $2, %rsi
-	call sum
-	movq %rax, %r11
-
-	movq $2, %r12
-	movq %r11, %rax
-	cqo
-	idiv %r12
-	movq %rax, %r11
-
-	movq $2, %r12
-	imul %r11, %r12
-	sub %r12, %r10
-	movl %r10d, %eax
+	movq $101, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $108, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $108, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $111, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $44, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $32, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $87, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $111, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $114, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $108, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $100, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $33, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	movq $10, %r10
+	push %rdi
+	movq %r10, %rdi
+	call putchar
+	pop %rdi
+	movq %rax, %r10
+	xor %rax, %rax
 	mov %rbp, %rsp
 	pop %rbp
 	ret
+	add $1918986339, %rsp
