@@ -29,7 +29,7 @@ AST *Parser::expr()
 // [ expr ]
 AST *Parser::exp_option()
 {
-	if (l.pnxt().type == SEMI || l.pnxt().type == LPAREN)
+	if (l.pnxt().type == SEMI || l.pnxt().type == RPAREN)
 		return new AST(NONE);
 	else
 		return expr();
@@ -247,7 +247,7 @@ AST *Parser::decl()
 		if (globl)
 			Scope::s(cur_scope)->syms.back().val = true;
 
-		out->op = OP_SET;
+		out->type = DECL_SET;
 		l.eat(OP_SET);
 		out->rhs = expr();
 	}
@@ -438,25 +438,41 @@ AST *Parser::assign()
 	
 	l.eat(t);
 
-	return new AST(ASSIGN, t, lv, expr());
+	return new AST(Parser::asnode(t), lv, expr());
 }
 
 // -------- binary operations -------- //
 
-#define BINEXP(func, call_func, type_eval)             \
-	AST *Parser::func()                                \
-	{                                                  \
-		AST *out = call_func();                        \
-		TokType t = l.pnxt().type;                     \
-                                                       \
-		while (type_eval)                              \
-		{                                              \
-			l.eat(t);                                  \
-			out = new AST(BINOP, t, out, call_func()); \
-			t = l.pnxt().type;                         \
-		}                                              \
-                                                       \
-		return out;                                    \
+#define BINEXP(func, call_func, type_eval, node)   \
+	AST *Parser::func()                            \
+	{                                              \
+		AST *out = call_func();                    \
+		TokType t = l.pnxt().type;                 \
+                                                   \
+		while (type_eval)                          \
+		{                                          \
+			l.eat(t);                              \
+			out = new AST(node, out, call_func()); \
+			t = l.pnxt().type;                     \
+		}                                          \
+                                                   \
+		return out;                                \
+	}
+
+#define BINEXP_ASNODE(func, call_func, type_eval)                   \
+	AST *Parser::func()                                              \
+	{                                                                \
+		AST *out = call_func();                                      \
+		TokType t = l.pnxt().type;                                   \
+                                                                     \
+		while (type_eval)                                            \
+		{                                                            \
+			l.eat(t);                                                \
+			out = new AST(Parser::asnode(t), out, call_func()); \
+			t = l.pnxt().type;                                       \
+		}                                                            \
+                                                                     \
+		return out;                                                  \
 	}
 
 // op_or [ '?' expr ':' cond ]
@@ -479,54 +495,62 @@ AST *Parser::cond()
 }
 
 // op_and { '||' op_and }
-BINEXP(op_or, op_and, t == OP_LOGOR)
+BINEXP(op_or, op_and, t == OP_LOGOR, LOGOR)
 
 // bitwise_or { '&&' bitwise_or }
-BINEXP(op_and, bitwise_or, t == OP_LOGAND)
+BINEXP(op_and, bitwise_or, t == OP_LOGAND, LOGAND)
 
 // bitwise_xor { '|' bitwise_xor }
-BINEXP(bitwise_or, bitwise_xor, t == OP_OR)
+BINEXP(bitwise_or, bitwise_xor, t == OP_OR, OR)
 
 // bitwise_and { '^' bitwise_and }
-BINEXP(bitwise_xor, bitwise_and, t == OP_XOR)
+BINEXP(bitwise_xor, bitwise_and, t == OP_XOR, XOR)
 
 // equality { '&' equality }
-BINEXP(bitwise_and, equality, t == OP_AMPER)
+BINEXP(bitwise_and, equality, t == OP_AMPER, AND)
 
 // comparison { ( OP_EQ | OP_NE ) comparison }
-BINEXP(equality, comparison, t == OP_EQ || t == OP_NE)
+BINEXP_ASNODE(equality, comparison, t == OP_EQ || t == OP_NE)
 
 // shift { ( OP_LE | OP_GE | '<' | '>' ) shift }
-BINEXP(comparison, shift, t == OP_LE || t == OP_GE || t == OP_LT || t == OP_GT)
+BINEXP_ASNODE(comparison, shift, t == OP_LE || t == OP_GE || t == OP_LT || t == OP_GT)
 
 // term { ( OP_SHR | OP_SHL ) term }
-BINEXP(shift, term, t == OP_SHL || t == OP_SHR)
+BINEXP_ASNODE(shift, term, t == OP_SHL || t == OP_SHR)
 
 // factor { ( '+' | '-' ) factor }
-BINEXP(term, factor, t == OP_ADD || t == OP_SUB)
+BINEXP_ASNODE(term, factor, t == OP_ADD || t == OP_SUB)
 
 // unop { ( '/' | '*' | '%' ) unop }
-BINEXP(factor, unop, t == OP_DIV || t == OP_MUL || t == OP_MOD)
+BINEXP_ASNODE(factor, unop, t == OP_DIV || t == OP_MUL || t == OP_MOD)
 
 // postfix | ( OP_INC | OP_DEC | '&' | '* ) lval | ( '!' | '~' | '-' ) unop
 // lhs = operand
 AST *Parser::unop()
 {
 	TokType t = l.pnxt().type;
-	if (t == OP_INC || t == OP_DEC || t == OP_AMPER || t == OP_MUL)
-	{
-		l.eat(t);
 
-		return new AST(UNOP, t, lval());
-	}
-	else if (t == OP_LOGNOT || t == OP_NOT || t == OP_SUB)
-	{
-		l.eat(t);
+	NodeType n;
+	bool lv = true;
 
-		return new AST(UNOP, t, unop());
+	switch (t) {
+		case OP_INC: n = UN_INC; break;
+		case OP_DEC: n = UN_DEC; break;
+		case OP_AMPER: n = REF; break;
+		case OP_MUL: n = PTR; break;
+		case OP_SUB:
+			n = NEG; lv = false; break;
+		case OP_LOGNOT:
+		case OP_NOT:
+			n = Parser::asnode(t);
+			lv = false;
+			break;
+		default: return postfix();
 	}
-	else
-		return postfix();
+
+	l.eat(t);
+
+	return new AST(n, lv ? lval() : unop());
 }
 
 // primary [ OP_INC | OP_DEC ]
@@ -538,7 +562,7 @@ AST *Parser::postfix()
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
-		return new AST(POSTFIX, t, p);
+		return new AST((t == OP_INC) ? POST_INC : POST_DEC, p);
 	}
 	else
 		return p;
@@ -554,9 +578,7 @@ AST *Parser::primary()
 	if (t == INT_CONSTANT || t == CHAR_CONSTANT)
 	{
 		l.eat(t);
-		AST *a = new AST(CONST, std::get<long long>(tok.val));
-		a->op = t;
-		return a;
+		return new AST(INT_CONST, std::get<long long>(tok.val));
 	}
 	else if (t == IDENTIFIER)
 	{
@@ -654,4 +676,32 @@ void Parser::parse_err(const std::string &msg, const Token &err_tok)
 			  << '\n';
 
 	exit(1);
+}
+
+// omitted: and, inc, dec
+// note that mul = ptr and sub = neg
+NodeType Parser::asnode(TokType t)
+{
+	if (t >= OP_SHR_SET && t <= OP_OR_SET)
+		return static_cast<NodeType>(SET_SHR + (t - OP_SHR_SET));
+	else if (t >= OP_LE && t <= OP_GT)
+		return static_cast<NodeType>(N_LE + (t - OP_LE));
+	else if (t >= OP_ADD && t <= OP_DIV)
+		return static_cast<NodeType>(ADD + (t - OP_ADD));
+	else
+	{
+		switch (t) {
+			case OP_SHL: 	return SHL;
+			case OP_SHR: 	return SHR;
+			case OP_LOGAND: return LOGAND;
+			case OP_LOGOR: 	return LOGOR;
+			case OP_LOGNOT: return LOGNOT;
+			case OP_SET: 	return SET;
+			case OP_MOD: 	return MOD;
+			case OP_OR: 	return OR;
+			case OP_XOR: 	return XOR;
+			case OP_NOT: 	return NOT;
+			default: return NONE;
+		}
+	}
 }

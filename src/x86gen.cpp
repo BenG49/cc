@@ -28,6 +28,9 @@ void emit_lbl(int lbl)
 
 Reg emit_mov(Reg src, Reg dst, Size s)
 {
+	if (src == dst)
+		return src;
+
 	out << '\t' << MOV[s] << REGS[s][src] << ", " << REGS[s][dst] << '\n';
 	if (src < SCRATCH_COUNT) free_reg(src);
 	return dst;
@@ -58,29 +61,29 @@ void emit_pop(Reg r)
 	out << "\tpop " << REGS[Quad][r] << '\n';
 }
 
-Reg emit_post(Reg val, TokType op, const Sym &s)
+Reg emit_post(Reg val, NodeType op, const Sym &s)
 {
-	if (op == OP_INC)
+	if (op == POST_INC)
 		out << "\tinc " << REGS[Quad][val];
-	else if (op == OP_DEC)
+	else if (op == POST_DEC)
 		out << "\tdec " << REGS[Quad][val];
 	out << '\n';
 
 	set_var(val, s);
 
 	// undo val
-	if (op == OP_INC)
+	if (op == POST_INC)
 		out << "\tdec " << REGS[Quad][val];
-	else if (op == OP_DEC)
+	else if (op == POST_DEC)
 		out << "\tinc " << REGS[Quad][val];
 	out << '\n';
 
 	return val;
 }
 
-Reg emit_unop(Reg val, TokType op)
+Reg emit_unop(Reg val, NodeType op)
 {
-	if (op == OP_LOGNOT)
+	if (op == LOGNOT)
 	{
 		out << "\ttest " << REGS[Quad][val] << ", " << REGS[Quad][val] << '\n';
 		out << "\tmovq $0, " << REGS[Quad][val] << '\n';
@@ -89,10 +92,10 @@ Reg emit_unop(Reg val, TokType op)
 	}
 
 	switch (op) {
-		case OP_SUB: out << "\tneg "; break;
-		case OP_NOT: out << "\tnot "; break;
-		case OP_INC: out << "\tinc "; break;
-		case OP_DEC: out << "\tdec "; break;
+		case NEG: out << "\tneg "; break;
+		case NOT: out << "\tnot "; break;
+		case UN_INC: out << "\tinc "; break;
+		case UN_DEC: out << "\tdec "; break;
 	}
 
 	out << REGS[Quad][val] << '\n';
@@ -101,29 +104,29 @@ Reg emit_unop(Reg val, TokType op)
 }
 
 // note that sub, shr, and shl must be called with inverted args
-Reg emit_binop(Reg src, Reg dst, TokType op)
+Reg emit_binop(Reg src, Reg dst, NodeType op)
 {
-	if (op == OP_SHR || op == OP_SHL)
+	if (op == SHR || op == SHL)
 		// arg 3 = rcx
 		src = emit_mov(src, A3, Quad);
 
 	switch (op) {
-		case OP_ADD_SET:
-		case OP_ADD: out << "\tadd "; break;
-		case OP_SUB_SET:
-		case OP_SUB: out << "\tsub "; break;
-		case OP_MUL_SET:
-		case OP_MUL: out << "\timul "; break;
-		case OP_OR_SET:
-		case OP_OR: out << "\tor "; break;
-		case OP_AND_SET:
-		case OP_AMPER: out << "\tand "; break;
-		case OP_XOR_SET:
-		case OP_XOR: out << "\txor "; break;
-		case OP_SHR_SET:
-		case OP_SHR: out << "\tsar "; break;
-		case OP_SHL_SET:
-		case OP_SHL: out << "\tsal "; break;
+		case SET_ADD:
+		case ADD: out << "\tadd "; break;
+		case SET_SUB:
+		case SUB: out << "\tsub "; break;
+		case SET_MUL:
+		case MUL: out << "\timul "; break;
+		case SET_OR:
+		case OR: out << "\tor "; break;
+		case SET_AND:
+		case AND: out << "\tand "; break;
+		case SET_XOR:
+		case XOR: out << "\txor "; break;
+		case SET_SHR:
+		case SHR: out << "\tsar "; break;
+		case SET_SHL:
+		case SHL: out << "\tsal "; break;
 	}
 
 	out << REGS[Quad][src] << ", " << REGS[Quad][dst] << '\n';
@@ -133,13 +136,13 @@ Reg emit_binop(Reg src, Reg dst, TokType op)
 	return dst;
 }
 
-Reg emit_div(Reg dst, Reg src, TokType op)
+Reg emit_div(Reg dst, Reg src, NodeType op)
 {
 	out << "\tmovq " << REGS[Quad][dst] << ", %rax\n";
 
 	out << "\tcqo\n\tidiv " << REGS[Quad][src] << '\n';
 
-	if (op == OP_DIV || op == OP_DIV_SET)
+	if (op == DIV || op == SET_DIV)
 		out << "\tmovq %rax, " << REGS[Quad][dst] << '\n';
 	else
 		out << "\tmovq %rdx, " << REGS[Quad][dst] << '\n';
@@ -149,22 +152,22 @@ Reg emit_div(Reg dst, Reg src, TokType op)
 	return dst;
 }
 
-Reg cmp_set(Reg a, Reg b, TokType op)
+Reg cmp_set(Reg a, Reg b, NodeType op)
 {
 	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
-	out << '\t' << CMP_SET[op - OP_LE] << REGS[Byte][a] << '\n';
+	out << '\t' << CMP_SET[op - N_LE] << REGS[Byte][a] << '\n';
 
 	free_reg(b);
 
 	return a;
 }
 
-void cmp_jmp(Reg a, Reg b, TokType op, int label)
+void cmp_jmp(Reg a, Reg b, NodeType op, int label)
 {
 	out << "\tcmp " << REGS[Quad][b] << ", " << REGS[Quad][a] << '\n';
 
-	emit_jmp(op - OP_LE, label);
+	emit_jmp(op - N_LE, label);
 
 	free_all();
 }
@@ -175,12 +178,12 @@ Reg logic_and_set(Reg a, AST *b, Ctx c)
 	int end = label();
 
 	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
-	emit_jmp(NE, second);
+	emit_jmp(EQ, second);
 	out << "\txor " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
 	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
-	Reg rhs = gen_ast(b, Ctx(c, BINOP));
+	Reg rhs = gen_ast(b->rhs, Ctx(c, b->type));
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
 	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
@@ -197,12 +200,12 @@ Reg logic_or_set(Reg a, AST *b, Ctx c)
 	int end = label();
 
 	out << "\ttest " << REGS[Quad][a] << ", " << REGS[Quad][a] << '\n';
-	emit_jmp(EQ, second);
+	emit_jmp(NE, second);
 	out << "\tmovq $1, " << REGS[Quad][a] << '\n';
 	emit_jmp(UNCOND, end);
 
 	emit_lbl(second);
-	Reg rhs = gen_ast(b, Ctx(c, BINOP));
+	Reg rhs = gen_ast(b->rhs, Ctx(c, b->type));
 	out << "\ttest " << REGS[Quad][rhs] << ", " << REGS[Quad][rhs] << '\n';
 	out << "\tmov $0, " << REGS[Quad][a] << '\n';
 	out << '\t' << CMP_SET[NE] << REGS[Byte][a] << '\n';
@@ -217,7 +220,7 @@ void cond_jmp(AST *n, Ctx c)
 {
 	Reg r = gen_ast(n, c);
 
-	if (n->type != BINOP || n->op < OP_LE || n->op > OP_GT)
+	if (n->type < SHR || n->type > XOR || n->type < N_LE || n->type > N_GT)
 	{
 		out << "\ttest " << REGS[Quad][r] << ", " << REGS[Quad][r] << '\n';
 		out << '\t' << JMPS[NE] << 'L' << c.lbl << '\n';
@@ -283,7 +286,8 @@ Reg set_var(Reg r, const Sym &s)
 
 void gen_globls()
 {
-	out << ".data\n";
+	if (globls.size())
+		out << ".data\n";
 
 	for (auto p : globls)
 	{

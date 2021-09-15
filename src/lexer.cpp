@@ -26,7 +26,7 @@ const char *NAMES[TOK_COUNT - IDENTIFIER] = {
 	"string constant",
 };
 
-const char CHAR_TOKENS[] = "<>;=-+*/,[](){}&|%!~^.?:";
+const char CHAR_TOKENS[] = "<>;=+-*/,[](){}&|%!~^.?:";
 
 char esc_code(char c)
 {

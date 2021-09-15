@@ -63,6 +63,32 @@ int label() { return lbl_n++; }
 
 Reg gen_ast(AST *n, Ctx c)
 {
+	if ((n->type >= SET && n->type <= SET_OR) || n->type == DECL_SET)
+	{
+		Reg rval = gen_ast(n->rhs, Ctx(c, n->type));
+
+		if (n->type != SET && n->type != DECL_SET)
+		{
+			Reg lval = gen_ast(n->lhs, Ctx(c, n->type));
+
+			if (n->type == SET_SUB || n->type == SET_SHR || n->type == SET_SHL)
+				lval = emit_binop(rval, lval, n->type);
+			else if (n->type == SET_DIV || n->type == SET_MOD)
+				lval = emit_div(lval, rval, n->type);
+			else
+				lval = emit_binop(lval, rval, n->type);
+			
+			return set_var(lval, n->lhs->get_sym());
+		}
+		else if (n->type == DECL_SET && n->lhs->get_sym().vtype == V_GLOBL)
+		{
+			add_globl(n->lhs->get_sym(), n->rhs);
+			return NOREG;
+		}
+			// get rvalue, set lvalue
+			return set_var(rval, n->lhs->get_sym());
+	}
+
 	switch (n->type) {
 		case FUNC:
 			if (n->rhs)
@@ -95,33 +121,9 @@ Reg gen_ast(AST *n, Ctx c)
 
 		case DECL:
 			if (n->lhs->get_sym().vtype == V_GLOBL)
-			{
 				add_globl(n->lhs->get_sym(), n->rhs);
-				return NOREG;
-			}
-		case ASSIGN: {
-			if (!n->rhs)
-				return NOREG;
-			
-			Reg rval = gen_ast(n->rhs, Ctx(c, n->type));
 
-			if (n->op != OP_SET)
-			{
-				Reg lval = gen_ast(n->lhs, Ctx(c, n->type));
-
-				if (n->op == OP_SUB_SET || n->op == OP_SHR_SET || n->op == OP_SHL_SET)
-					lval = emit_binop(rval, lval, n->op);
-				else if (n->op == OP_DIV_SET || n->op == OP_MOD_SET)
-					lval = emit_div(lval, rval, n->op);
-				else
-					lval = emit_binop(lval, rval, n->op);
-				
-				return set_var(lval, n->lhs->get_sym());
-			}
-			else
-				// get rvalue, set lvalue
-				return set_var(rval, n->lhs->get_sym());
-		}
+			return NOREG;
 
 		case IF:
 			gen_if(n, c);
@@ -155,48 +157,52 @@ Reg gen_ast(AST *n, Ctx c)
 	if (n->lhs)
 		l = gen_ast(n->lhs, Ctx(c, n->type));
 
-	if (n->op == OP_LOGAND)
-		return logic_and_set(l, n->rhs, c);
-	else if (n->op == OP_LOGOR)
-		return logic_or_set(l, n->rhs, c);
+	if (n->type == LOGAND)
+		return logic_and_set(l, n, c);
+	else if (n->type == LOGOR)
+		return logic_or_set(l, n, c);
 
 	if (n->rhs)
 		r = gen_ast(n->rhs, Ctx(c, n->type, l));
 	
-	switch (n->type) {
-		case CONST:
-			return emit_int(n->val);
-
-		case BINOP:
-			if (n->op == OP_SUB || n->op == OP_SHR || n->op == OP_SHL)
-				return emit_binop(r, l, n->op);
-			else if (n->op == OP_DIV || n->op == OP_MOD)
-				return emit_div(l, r, n->op);
-			else if (n->op >= OP_LE && n->op <= OP_GT)
+	// binop
+	if (n->type >= SHR && n->type <= XOR)
+	{
+		if (n->type == SUB || n->type == SHR || n->type == SHL)
+			return emit_binop(r, l, n->type);
+		else if (n->type == DIV || n->type == MOD)
+			return emit_div(l, r, n->type);
+		else if (n->type >= N_LE && n->type <= N_GT)
+		{
+			// if label is specified
+			if (c.lbl)
 			{
-				// if label is specified
-				if (c.lbl)
-				{
-					cmp_jmp(l, r, n->op, c.lbl);
-					return NOREG;
-				}
-				else
-					return cmp_set(l, r, n->op);
+				cmp_jmp(l, r, n->type, c.lbl);
+				return NOREG;
 			}
 			else
-				return emit_binop(l, r, n->op);
-
-		case UNOP: {
-			Reg r = emit_unop(l, n->op);
-
-			if (n->op == OP_INC || n->op == OP_DEC)
-				return set_var(r, n->lhs->get_sym());
-			else
-				return r;
+				return cmp_set(l, r, n->type);
 		}
+		else
+			return emit_binop(l, r, n->type);
+	}
+	else if (n->type >= UN_INC && n->type <= PTR)
+	{
+		Reg r = emit_unop(l, n->type);
 
-		case POSTFIX:
-			return emit_post(l, n->op, n->lhs->get_sym());
+		if (n->type == UN_INC || n->type == UN_DEC)
+			return set_var(r, n->lhs->get_sym());
+		else
+			return r;
+	}
+	
+	switch (n->type) {
+		case INT_CONST:
+			return emit_int(n->val);
+
+		case POST_INC:
+		case POST_DEC:
+			return emit_post(l, n->type, n->lhs->get_sym());
 
 		case RET:
 			emit_ret(l, getsize(n->lhs->get_sym().type));
@@ -206,7 +212,7 @@ Reg gen_ast(AST *n, Ctx c)
 		case VAR: {
 			Sym &s = n->get_sym();
 
-			if (c.parent == DECL || (c.parent == ASSIGN && c.reg != NOREG))
+			if (c.parent == DECL_SET && c.reg != NOREG)
 				return set_var(c.reg, s);
 			// not assigning
 			else
@@ -219,7 +225,7 @@ Reg gen_ast(AST *n, Ctx c)
 
 void add_globl(const Sym &s, AST *val)
 {
-	if (val && val->type != CONST)
+	if (val && val->type != INT_CONST)
 		cg_err("Global must be initialized with constant");
 	
 	for (unsigned i = 0; i < globls.size(); ++i)

@@ -2,92 +2,22 @@
 main:
 	push %rbp
 	mov %rsp, %rbp
-	movq $72, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $101, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $108, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $108, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $111, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $44, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $32, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $87, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $111, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $114, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $108, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $100, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $33, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
-	movq $10, %r10
-	push %rdi
-	movq %r10, %rdi
-	call putchar
-	pop %rdi
-	movq %rax, %r10
+	movq $0, %r10
+	test %r10, %r10
+	je L1
+	movq $1, %r10
+	jmp L2
+L1:
+	movq $1, %r11
+	test %r11, %r11
+	mov $0, %r10
+	setne %r10b
+L2:
+	movl %r10d, %eax
+	mov %rbp, %rsp
+	pop %rbp
+	ret
 	xor %rax, %rax
 	mov %rbp, %rsp
 	pop %rbp
 	ret
-.data

@@ -79,14 +79,14 @@ void emit_push(Reg r);
 void emit_pop(Reg r);
 
 // computation
-Reg emit_post(Reg val, TokType op, const Sym &s);
-Reg emit_unop(Reg val, TokType op);
-Reg emit_binop(Reg src, Reg dst, TokType op);
-Reg emit_div(Reg dst, Reg src, TokType op);
+Reg emit_post(Reg val, NodeType op, const Sym &s);
+Reg emit_unop(Reg val, NodeType op);
+Reg emit_binop(Reg src, Reg dst, NodeType op);
+Reg emit_div(Reg dst, Reg src, NodeType op);
 
 // comparison and jumps
-Reg cmp_set(Reg a, Reg b, TokType op);
-void cmp_jmp(Reg a, Reg b, TokType op, int lbl);
+Reg cmp_set(Reg a, Reg b, NodeType op);
+void cmp_jmp(Reg a, Reg b, NodeType op, int lbl);
 Reg logic_and_set(Reg a, AST *b, Ctx c);
 Reg logic_or_set(Reg a, AST *b, Ctx c);
 void cond_jmp(AST *n, Ctx c);

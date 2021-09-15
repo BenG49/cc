@@ -15,30 +15,74 @@ enum NodeType {
 	WHILE,
 	DO,
 	DECL,
-	ASSIGN,
+	DECL_SET,
+
+	// assignment
+	SET,
+	SET_SHR,
+	SET_SHL,
+	SET_ADD,
+	SET_SUB,
+	SET_MUL,
+	SET_DIV,
+	SET_MOD,
+	SET_AND,
+	SET_XOR,
+	SET_OR,
+
+	// binary op
+	SHR,
+	SHL,
+	LOGAND,
+	LOGOR,
+	N_LE,
+	N_GE,
+	N_EQ,
+	N_NE,
+	N_LT,
+	N_GT,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	MOD,
+	AND,
+	OR,
+	XOR,
+
+	// unary op
+	UN_INC,
+	UN_DEC,
+	LOGNOT,
+	NOT,
+	NEG,
+	REF,
+	PTR,
+
+	// postfix exp
+	POST_INC,
+	POST_DEC,
+
 	FUNC,
+	CALL,
 	RET,
-	BINOP,
-	UNOP,
-	POSTFIX,
 	COND,
-	CONST,
 	VAR,
 	BREAK,
 	CONT,
-	CALL,
-	PTR,
+	INT_CONST,
+
+	NODE_COUNT
 };
 
 struct AST {
 	NodeType type;
-	TokType op;
 	AST *lhs, *mid, *rhs;
 
 	int val;
 	int scope_id;
 
-	Sym &get_sym() { return Scope::s(scope_id)->syms[val]; }
+	Sym &get_sym() const { return Scope::s(scope_id)->syms[val]; }
 
 	// appends to an "ast list"
 	// ordering: top down, left to right
@@ -77,13 +121,6 @@ struct AST {
 
 	AST(NodeType type)
 		: AST(type, nullptr, nullptr, nullptr) {}
-
-	// op constructors
-	AST(NodeType type, TokType op, AST *lhs, AST *rhs)
-		: type(type), op(op), lhs(lhs), mid(nullptr), rhs(rhs) {}
-
-	AST(NodeType type, TokType op, AST *lhs)
-		: AST(type, op, lhs, nullptr) {}
 
 	// val leaf
 	AST(NodeType type, int val)
@@ -191,4 +228,6 @@ public:
 		, in_loop(false) {}
 
 	AST *parse();
+
+	static NodeType asnode(TokType t);
 };

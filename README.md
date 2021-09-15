@@ -35,6 +35,7 @@ The least optimized compiler you'll ever see.
 - assign all evaluatable nodes (binop, unop, const) size
 	- maybe after parsing
 	- add implicit cast warnings, keep track of pointer depth (char **arr)
+- test break after nested for looop
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
