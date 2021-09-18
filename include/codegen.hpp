@@ -8,36 +8,17 @@
 #include <parser.hpp>
 #include <scope.hpp>
 
-enum Reg {
-	// scratch regs
-	R0,
-	R1,
-	R2,
-	R3,
-	R4,
-	R5,
-
-	// stack regs
-	A0,
-	A1,
-	A2,
-	A3,
-	A4,
-	A5,
-	// return reg
-	RR,
-
-	COUNT,
-	NOREG
-};
-
+enum Reg : int8_t;
 enum Size { Byte, Word, Long, Quad };
 enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
 
 Size getsize(TokType t);
 
-const int SCRATCH_COUNT = 6;
-extern const char *REGS[4][COUNT];
+const Reg NOREG = static_cast<Reg>(-1);
+const Reg FIRST_ARG = static_cast<Reg>(6);
+
+extern const int ARG_COUNT;
+
 extern std::vector<std::pair<Sym, AST*>> globls;
 
 struct Ctx

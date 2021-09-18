@@ -4,7 +4,7 @@
 #include <err.hpp>
 
 // true=free, false=allocated
-bool free_regs[SCRATCH_COUNT] = { true };
+bool free_regs[FIRST_ARG] = { true };
 std::vector<std::pair<Sym, AST *>> globls;
 
 Size getsize(TokType t)
@@ -25,7 +25,7 @@ int lbl_n = 1;
 
 Reg alloc_reg()
 {
-	for (int i = 0; i < SCRATCH_COUNT; ++i)
+	for (int i = 0; i < FIRST_ARG; ++i)
 	{
 		if (free_regs[i])
 		{
@@ -49,7 +49,7 @@ void free_reg(Reg reg)
 
 void free_all()
 {
-	for (int i = 0; i < SCRATCH_COUNT; ++i)
+	for (int i = 0; i < FIRST_ARG; ++i)
 		free_regs[i] = true;
 }
 
@@ -385,7 +385,7 @@ Reg gen_call(AST *n, Ctx c)
 {
 	bool pushed_regs[6] = {0};
 	// push registers in use
-	for (int i = 0; i < SCRATCH_COUNT; ++i)
+	for (int i = 0; i < FIRST_ARG; ++i)
 		if (!free_regs[i])
 		{
 			emit_push(static_cast<Reg>(i));
@@ -400,9 +400,9 @@ Reg gen_call(AST *n, Ctx c)
 	{
 		Reg r = gen_ast(i.next(), Ctx(c, CALL));
 
-		if (count < 6)
+		if (count < ARG_COUNT)
 		{
-			Reg arg = static_cast<Reg>(SCRATCH_COUNT + count);
+			Reg arg = static_cast<Reg>(FIRST_ARG + count);
 			emit_push(arg);
 			emit_mov(r, arg, Quad);
 		}
@@ -422,14 +422,14 @@ Reg gen_call(AST *n, Ctx c)
 	
 	// pop saved regs
 	for (int i = std::min(5, count - 1); i >= 0; --i)
-		emit_pop(static_cast<Reg>(SCRATCH_COUNT + i));
+		emit_pop(static_cast<Reg>(FIRST_ARG + i));
 
 	// pop prev saved regs
-	for (int i = SCRATCH_COUNT - 1; i >= 0; --i)
+	for (int i = FIRST_ARG - 1; i >= 0; --i)
 		if (pushed_regs[i])
 			emit_pop(static_cast<Reg>(i));
 	
 	Reg out = alloc_reg();
 
-	return emit_mov(RR, out, Quad);
+	return emit_mov(static_cast<Reg>(FIRST_ARG + ARG_COUNT), out, Quad);
 }

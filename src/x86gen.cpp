@@ -5,17 +5,23 @@
 
 // -------- codegen -------- //
 
-const char *REGS[4][COUNT] = {
+enum Reg : int8_t {
+	R0, R1, R2, R3, R4, R5, A0, A1, A2, A3, A4, A5, RR
+};
+
+const int ARG_COUNT = 6;
+
+static const char *REGS[4][13] = {
 	{ "%r10b", "%r11b", "%r12b", "%r13b", "%r14b", "%r15b", "%dil", "%sil", "%dl",  "%cl",  "%r8l", "%r9l", "%al"  }, // 8
 	{ "%r10w", "%r11w", "%r12w", "%r13w", "%r14w", "%r15w", "%di",  "%si",  "%dx",  "%cx",  "%r8w", "%r9w", "%ax"  }, // 16
 	{ "%r10d", "%r11d", "%r12d", "%r13d", "%r14d", "%r15d", "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d", "%eax" }, // 32
 	{ "%r10",  "%r11",  "%r12",  "%r13",  "%r14",  "%r15",  "%rdi", "%rsi", "%rdx", "%rcx", "%r8",  "%r9",  "%rax" }, // 64
 };
 
-const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
-const char *GLOBL_ALLOC[4] = { ".byte ", ".word ", ".long ", ".quad " };
-const char *CMP_SET[6] = { "setle ", "setge ", "sete ", "setne ", "setl ", "setg " };
-const char *JMPS[7] = { "jg ", "jl ", "jne ", "je ", "jge ", "jle ", "jmp " };
+static const char *MOV[4] = { "movb ", "movw ", "movl ", "movq " };
+static const char *GLOBL_ALLOC[4] = { ".byte ", ".word ", ".long ", ".quad " };
+static const char *CMP_SET[6] = { "setle ", "setge ", "sete ", "setne ", "setl ", "setg " };
+static const char *JMPS[7] = { "jg ", "jl ", "jne ", "je ", "jge ", "jle ", "jmp " };
 
 std::ofstream out;
 
@@ -35,7 +41,7 @@ Reg emit_mov(Reg src, Reg dst, Size s)
 		return src;
 
 	out << '\t' << MOV[s] << REGS[s][src] << ", " << REGS[s][dst] << '\n';
-	if (src < SCRATCH_COUNT) free_reg(src);
+	if (src < FIRST_ARG) free_reg(src);
 	return dst;
 }
 
@@ -293,7 +299,6 @@ Reg set_var(Reg r, const Sym &s)
 	return r;
 }
 
-// TODO: use .comm
 void gen_globls()
 {
 	if (globls.size())
@@ -301,13 +306,14 @@ void gen_globls()
 
 	for (auto p : globls)
 	{
-		out << p.first.name << ": ";
+		// uninit: 	.comm name, size
+		// init:	name: .<directive> value
 
-		// initialized var
+		// uninitialized
 		if (!p.second)
-			out << ".zero " << (1 << p_sizeof(p.first.type)) << '\n';
+			out << ".comm " << p.first.name << ", " << (1 << p_sizeof(p.first.type)) << '\n';
 		else
-			out << GLOBL_ALLOC[p_sizeof(p.first.type)] << ' ' << p.second->val << '\n';
+			out << p.first.name << ": " << GLOBL_ALLOC[p_sizeof(p.first.type)] << ' ' << p.second->val << '\n';
 	}
 }
 

@@ -144,10 +144,10 @@ AST *Parser::func()
 		PrimType p = Parser::asptype(t);
 
 		// get param name
-		if (param_count < 6)
+		if (param_count < ARG_COUNT)
 			cur->syms.push_back(Sym(V_REG, p,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
-				SCRATCH_COUNT + param_count));
+				FIRST_ARG + param_count));
 		else
 			cur->syms.push_back(Sym(V_VAR, p,
 				std::get<std::string>(l.eat(IDENTIFIER).val),

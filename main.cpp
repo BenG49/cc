@@ -2,21 +2,16 @@
 
 #include <codegen.hpp>
 #include <scope.hpp>
-#include <err.hpp>
 #include <types.hpp>
-
-void ptabs(int count)
-{
-	for (int i = 0; i < count; ++i)
-		printf("  ");
-}
+#include <err.hpp>
 
 void prettyprint(const AST *ast, int tabs)
 {
 	if (!ast)
 		return;
 
-	ptabs(tabs);
+	for (int i = 0; i < tabs; ++i)
+		printf("  ");
 
 	if (ast->val)
 		printf("%s %d ptype: %d\n", NODE_NAMES[ast->type], ast->val, ast->ptype);
@@ -24,6 +19,7 @@ void prettyprint(const AST *ast, int tabs)
 		printf("%s %s ptype: %d\n", NODE_NAMES[ast->type], ast->get_sym().name.c_str(), ast->ptype);
 	else
 		printf("%s\n", NODE_NAMES[ast->type]);
+
 	prettyprint(ast->lhs, tabs + 1);
 	prettyprint(ast->mid, tabs + 1);
 	prettyprint(ast->rhs, tabs + 1);

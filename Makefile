@@ -1,11 +1,11 @@
 CUR_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-CC=g++
-CFLAGS=-Wall -Wno-switch -I$(CUR_DIR)/include -std=c++17 -g
+CC := g++
+CFLAGS := -Wall -Wno-switch -I$(CUR_DIR)/include -std=c++17 -g
 
-SRCS=$(shell find $(CUR_DIR)/src/ -type f -name '*.cpp')
-HDRS=$(shell find $(CUR_DIR)/include/ -type f -name '*.hpp')
-OBJS=${SRCS:.cpp=.o}
+SRCS := $(shell find $(CUR_DIR)/src/ -type f -name '*.cpp')
+HDRS := $(shell find $(CUR_DIR)/include/ -type f -name '*.hpp')
+OBJS := ${SRCS:.cpp=.o}
 
 # input vars, set on cmd line
 ARGS=
@@ -15,8 +15,6 @@ TARGET=cc.out
 
 ASM_TARGET=out.s
 OBJ_TARGET=${ASM_TARGET:.s=.o}
-
-TEST_SCRIPT=test.sh
 
 .PHONY: test clean debug
 
@@ -33,7 +31,7 @@ test: $(TARGET)
 clean:
 	$(RM) $(TARGET)
 	$(RM) $(OBJS)
-	$(RM) $(ASM_TARGET)
+	$(RM) tests/a
 
 debug: $(TARGET)
 	gdb --args $< tests/a.c
