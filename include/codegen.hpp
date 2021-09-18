@@ -60,8 +60,6 @@ struct Ctx
 		: Ctx(NOREG, parent, 0, breaklbl, contlbl) {}
 };
 
-void cg_err(const std::string &err);
-
 Reg alloc_reg();
 void free_reg(Reg reg);
 void free_all();
@@ -74,9 +72,10 @@ Reg emit_jmp(int type, int lbl);
 void emit_lbl(int lbl);
 Reg emit_mov(Reg src, Reg dst, Size s);
 void emit_mov(Reg src, int offset, Size s);
-Reg emit_int(int val);
+Reg emit_int(int val, Size s);
 void emit_push(Reg r);
 void emit_pop(Reg r);
+Reg emit_widen(Size oldtype, Size newtype, Reg r);
 
 // computation
 Reg emit_post(Reg val, NodeType op, const Sym &s);

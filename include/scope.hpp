@@ -1,6 +1,7 @@
 #pragma once
 
 #include <lexer.hpp>
+#include <defs.hpp>
 
 #include <vector>
 
@@ -8,13 +9,13 @@ enum VarType { V_GLOBL, V_VAR, V_REG, V_FUNC };
 
 struct Sym {
     VarType vtype;
-    TokType type;
+    PrimType type;
     std::string name;
     int val;
 
-    Sym(VarType vtype, TokType type, const std::string &name)
+    Sym(VarType vtype, PrimType type, const std::string &name)
         : vtype(vtype), type(type), name(name), val(0) {}
-    Sym(VarType vtype, TokType type, const std::string &name, int val)
+    Sym(VarType vtype, PrimType type, const std::string &name, int val)
         : vtype(vtype), type(type), name(name), val(val) {}
 };
 

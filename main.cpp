@@ -2,17 +2,14 @@
 
 #include <codegen.hpp>
 #include <scope.hpp>
+#include <err.hpp>
+#include <types.hpp>
 
 void ptabs(int count)
 {
 	for (int i = 0; i < count; ++i)
 		printf("  ");
 }
-
-// yes
-const char *NODE_NAMES[NODE_COUNT] = {
-	"none", "list", "if", "for", "fordecl", "while", "do", "decl", "decl_set", "=", ">>=", "<<=", "+=", "-=", "*=", "/=", "%=", "&=", "^=", "|=", ">>", "<<", "&&", "||", "<=", ">=", "==", "!=", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^", "++", "--", "!", "~", "-", "&", "*", "++", "--", "func", "call", "ret", "cond", "var", "break", "cont", "int const"
-};
 
 void prettyprint(const AST *ast, int tabs)
 {
@@ -22,9 +19,9 @@ void prettyprint(const AST *ast, int tabs)
 	ptabs(tabs);
 
 	if (ast->val)
-		printf("%s %d\n", NODE_NAMES[ast->type], ast->val);
+		printf("%s %d ptype: %d\n", NODE_NAMES[ast->type], ast->val, ast->ptype);
 	else if (ast->type == VAR)
-		printf("%s %s\n", NODE_NAMES[ast->type], ast->get_sym().name.c_str());
+		printf("%s %s ptype: %d\n", NODE_NAMES[ast->type], ast->get_sym().name.c_str(), ast->ptype);
 	else
 		printf("%s\n", NODE_NAMES[ast->type]);
 	prettyprint(ast->lhs, tabs + 1);

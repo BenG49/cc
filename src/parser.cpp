@@ -1,6 +1,8 @@
 #include <parser.hpp>
 
 #include <codegen.hpp>
+#include <types.hpp>
+#include <err.hpp>
 
 static bool is_type(TokType t)
 {
@@ -44,7 +46,7 @@ AST *Parser::stmt()
 	switch (l.pnxt().type) {
 		case KEY_RETURN:
 			l.eat(KEY_RETURN);
-			out = new AST(RET, expr());
+			out = new AST(RET, INT, expr());
 			break;
 		case KEY_IF:
 			out = if_stmt();
@@ -64,13 +66,13 @@ AST *Parser::stmt()
 			break;
 		case KEY_BREAK:
 			if (!in_loop)
-				parse_err("Break cannot appear outside of loop body", l.pnxt());
+				err_tok("Break cannot appear outside of loop body", l.pnxt());
 			l.eat(KEY_BREAK);
 			out = new AST(BREAK);
 			break;
 		case KEY_CONT:
 			if (!in_loop)
-				parse_err("Continue cannot appear outside of loop body", l.pnxt());
+				err_tok("Continue cannot appear outside of loop body", l.pnxt());
 			l.eat(KEY_CONT);
 			out = new AST(CONT);
 			break;
@@ -104,9 +106,10 @@ AST *Parser::func()
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	if (!is_type(t))
-		parse_err("Expected function return type", tok);
+		err_tok("Expected function return type", tok);
 
 	l.eat(t);
+	PrimType p = Parser::asptype(t);
 
 	// symbol entry //
 
@@ -116,8 +119,8 @@ AST *Parser::func()
 	bool prev_declared = globl->in_scope(name);
 
 	// add to sym tab
-	globl->syms.push_back(Sym(V_FUNC, t, name, 0));
-	out->lhs = new AST(globl->syms.size() - 1, Scope::GLOBAL);
+	globl->syms.push_back(Sym(V_FUNC, p, name, 0));
+	out->lhs = new AST(p, globl->syms.size() - 1, Scope::GLOBAL);
 
 	l.eat(LPAREN);
 	
@@ -135,21 +138,22 @@ AST *Parser::func()
 	while (t != RPAREN)
 	{
 		if (!is_type(t))
-			parse_err("Expected function param type", tok);
+			err_tok("Expected function param type", tok);
 		
 		l.eat(t);
+		PrimType p = Parser::asptype(t);
 
 		// get param name
 		if (param_count < 6)
-			cur->syms.push_back(Sym(V_REG, t,
+			cur->syms.push_back(Sym(V_REG, p,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
 				SCRATCH_COUNT + param_count));
 		else
-			cur->syms.push_back(Sym(V_VAR, t,
+			cur->syms.push_back(Sym(V_VAR, p,
 				std::get<std::string>(l.eat(IDENTIFIER).val),
 				p_offset += 8));
 
-		bottom = AST::append(bottom, new AST(cur->syms.size() - 1, cur_scope), LIST);
+		bottom = AST::append(bottom, new AST(p, cur->syms.size() - 1, cur_scope), LIST);
 
 		++param_count;
 
@@ -161,7 +165,7 @@ AST *Parser::func()
 	}
 
 	if (!t)
-		parse_err("Unclosed parentheses in function definition", tok);
+		err_tok("Unclosed parentheses in function definition", tok);
 	
 	// set value to param count
 	globl->syms.back().val = param_count;
@@ -175,9 +179,9 @@ AST *Parser::func()
 				// if the symbol is a function
 				// if the function has different num of params than this function
 				if (s.vtype == V_FUNC && s.val != param_count)
-					parse_err("Function parameter count does not match with previous declaration", tok);
+					err_tok("Function parameter count does not match with previous declaration", tok);
 				else if (s.vtype == V_GLOBL)
-					parse_err("Redefition of variable " + name, tok);
+					err_tok("Redefition of variable " + name, tok);
 			}
 	}
 
@@ -208,12 +212,13 @@ AST *Parser::decl()
 	if (is_type(type))
 		l.eat(type);
 	else
-		parse_err("Expected variable type preceding declaration", tok);
+		err_tok("Expected variable type preceding declaration", tok);
 
 	Token id = l.eat(IDENTIFIER);
+	PrimType t = Parser::asptype(id.type);
 	std::string name = std::get<std::string>(id.val);
 
-	AST *out = new AST(DECL, new AST(Scope::s(cur_scope)->syms.size(), cur_scope));
+	AST *out = new AST(DECL, t, new AST(t, Scope::s(cur_scope)->syms.size(), cur_scope));
 
 	bool assigned = l.pnxt().type == OP_SET;
 
@@ -224,20 +229,20 @@ AST *Parser::decl()
 		{
 			Sym &s = Scope::s(cur_scope)->get(name)->get_sym();
 			if (s.vtype == V_FUNC)
-				parse_err("Redefinition of function " + name, id);
+				err_tok("Redefinition of function " + name, id);
 			else if (assigned && s.vtype == V_GLOBL && s.val)
-				parse_err("Redefinition of variable " + name, id);
+				err_tok("Redefinition of variable " + name, id);
 		}
 		else
-			parse_err("Redefinition of variable " + name, id);
+			err_tok("Redefinition of variable " + name, id);
 	}
 
 	if (globl)
-		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, type, name));
+		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, Parser::asptype(type), name));
 	else
 	{
 		int sz = 1 << getsize(type);
-		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, type, name, (offset -= sz)));
+		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, Parser::asptype(type), name, (offset -= sz)));
 		stk_size += sz;
 	}
 
@@ -250,6 +255,10 @@ AST *Parser::decl()
 		out->type = DECL_SET;
 		l.eat(OP_SET);
 		out->rhs = expr();
+
+		// hacky fix for setting char to integer constant
+		if (out->lhs->get_sym().type == CHAR && out->rhs->type == INT_CONST)
+			out->rhs->ptype = CHAR;
 	}
 
 	l.eat(SEMI);
@@ -403,7 +412,7 @@ AST *Parser::compound(bool newscope)
 	}
 
 	if (!t)
-		parse_err("Unterminated function body", tok);
+		err_tok("Unterminated function body", tok);
 
 	l.eat(RBRAC);
 
@@ -434,45 +443,57 @@ AST *Parser::assign()
 	Token tok = l.pnxt();
 	TokType t = tok.type;
 	if (!is_assign(t))
-		parse_err("Expected assignment operator", tok);
+		err_tok("Expected assignment operator", tok);
 	
 	l.eat(t);
 
-	return new AST(Parser::asnode(t), lv, expr());
+	AST *rhs = expr();
+
+	// hacky fix for setting char to integer constant
+	if (lv->get_sym().type == CHAR && rhs->type == INT_CONST)
+		rhs->ptype = CHAR;
+
+	return new AST(Parser::asnode(t), INT, lv, rhs);
 }
 
 // -------- binary operations -------- //
 
-#define BINEXP(func, call_func, type_eval, node)   \
-	AST *Parser::func()                            \
-	{                                              \
-		AST *out = call_func();                    \
-		TokType t = l.pnxt().type;                 \
-                                                   \
-		while (type_eval)                          \
-		{                                          \
-			l.eat(t);                              \
-			out = new AST(node, out, call_func()); \
-			t = l.pnxt().type;                     \
-		}                                          \
-                                                   \
-		return out;                                \
+#define BINEXP(func, call_func, type_eval, node)                                               \
+	AST *Parser::func()                                                                        \
+	{                                                                                          \
+		AST *out = call_func();                                                                \
+		TokType t = l.pnxt().type;                                                             \
+                                                                                               \
+		while (type_eval)                                                                      \
+		{                                                                                      \
+			l.eat(t);                                                                          \
+			AST *c = call_func();                                                              \
+			out = new AST(node,                                                                \
+						  (p_sizeof(out->ptype) > p_sizeof(c->ptype)) ? out->ptype : c->ptype, \
+						  out, c);                                                             \
+			t = l.pnxt().type;                                                                 \
+		}                                                                                      \
+                                                                                               \
+		return out;                                                                            \
 	}
 
-#define BINEXP_ASNODE(func, call_func, type_eval)                   \
-	AST *Parser::func()                                              \
-	{                                                                \
-		AST *out = call_func();                                      \
-		TokType t = l.pnxt().type;                                   \
-                                                                     \
-		while (type_eval)                                            \
-		{                                                            \
-			l.eat(t);                                                \
-			out = new AST(Parser::asnode(t), out, call_func()); \
-			t = l.pnxt().type;                                       \
-		}                                                            \
-                                                                     \
-		return out;                                                  \
+#define BINEXP_ASNODE(func, call_func, type_eval)                                              \
+	AST *Parser::func()                                                                        \
+	{                                                                                          \
+		AST *out = call_func();                                                                \
+		TokType t = l.pnxt().type;                                                             \
+                                                                                               \
+		while (type_eval)                                                                      \
+		{                                                                                      \
+			l.eat(t);                                                                          \
+			AST *c = call_func();                                                              \
+			out = new AST(Parser::asnode(t),                                                   \
+						  (p_sizeof(out->ptype) > p_sizeof(c->ptype)) ? out->ptype : c->ptype, \
+						  out, c);                                                             \
+			t = l.pnxt().type;                                                                 \
+		}                                                                                      \
+                                                                                               \
+		return out;                                                                            \
 	}
 
 // op_or [ '?' expr ':' cond ]
@@ -488,7 +509,7 @@ AST *Parser::cond()
 
 		l.eat(OP_COLON);
 
-		return new AST(COND, c, t, cond());
+		return new AST(COND, INT, c, t, cond());
 	}
 	else
 		return c;
@@ -550,7 +571,7 @@ AST *Parser::unop()
 
 	l.eat(t);
 
-	return new AST(n, lv ? lval() : unop());
+	return new AST(n, INT, lv ? lval() : unop());
 }
 
 // primary [ OP_INC | OP_DEC ]
@@ -562,7 +583,7 @@ AST *Parser::postfix()
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
-		return new AST((t == OP_INC) ? POST_INC : POST_DEC, p);
+		return new AST((t == OP_INC) ? POST_INC : POST_DEC, INT, p);
 	}
 	else
 		return p;
@@ -575,10 +596,15 @@ AST *Parser::primary()
 	TokType t = tok.type;
 
 	// if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT || t == CHAR_CONSTANT)
-	if (t == INT_CONSTANT || t == CHAR_CONSTANT)
+	if (t == INT_CONSTANT)
 	{
 		l.eat(t);
-		return new AST(INT_CONST, std::get<long long>(tok.val));
+		return new AST(INT_CONST, INT, std::get<long long>(tok.val));
+	}
+	else if (t == CHAR_CONSTANT)
+	{
+		l.eat(t);
+		return new AST(INT_CONST, CHAR, std::get<long long>(tok.val));
 	}
 	else if (t == IDENTIFIER)
 	{
@@ -597,7 +623,7 @@ AST *Parser::primary()
 		return out;
 	}
 
-	parse_err(std::string("Invalid expression ") + l.getname(t), tok);
+	err_tok(std::string("Invalid expression ") + l.getname(t), tok);
 }
 
 // IDENTIFIER '(' [ expr { ',' expr } ] ')'
@@ -613,7 +639,7 @@ AST *Parser::call()
 	out->lhs = Scope::s(cur_scope)->get(std::get<std::string>(id.val));
 
 	if (out->lhs->get_sym().vtype != V_FUNC)
-		parse_err("Attempting to call variable", id);
+		err_tok("Attempting to call variable", id);
 
 	l.eat(LPAREN);
 
@@ -635,10 +661,10 @@ AST *Parser::call()
 	}
 
 	if (!t)
-		parse_err("Unclosed parentheses in function call", tok);
+		err_tok("Unclosed parentheses in function call", tok);
 	
 	if (param_count != out->lhs->get_sym().val)
-		parse_err("Too many arguments to function call", tok);
+		err_tok("Too many arguments to function call", tok);
 
 	l.eat(RPAREN);
 
@@ -668,16 +694,6 @@ AST *Parser::parse()
 	return out;
 }
 
-void Parser::parse_err(const std::string &msg, const Token &err_tok)
-{
-	std::cerr << msg
-			  << " at line " << err_tok.line
-			  << ", col " << err_tok.col
-			  << '\n';
-
-	exit(1);
-}
-
 // omitted: and, inc, dec
 // note that mul = ptr and sub = neg
 NodeType Parser::asnode(TokType t)
@@ -703,5 +719,16 @@ NodeType Parser::asnode(TokType t)
 			case OP_NOT: 	return NOT;
 			default: return NONE;
 		}
+	}
+}
+
+PrimType Parser::asptype(TokType t)
+{
+	switch (t) {
+		case KEY_INT:
+		case INT_CONSTANT:	return INT;
+		case KEY_CHAR:
+		case CHAR_CONSTANT:	return CHAR;
+		default: return INT;
 	}
 }

@@ -5,78 +5,11 @@
 
 #include <lexer.hpp>
 #include <scope.hpp>
-
-enum NodeType {
-	NONE,
-	LIST,
-	IF,
-	FOR,
-	FOR_DECL,
-	WHILE,
-	DO,
-	DECL,
-	DECL_SET,
-
-	// assignment
-	SET,
-	SET_SHR,
-	SET_SHL,
-	SET_ADD,
-	SET_SUB,
-	SET_MUL,
-	SET_DIV,
-	SET_MOD,
-	SET_AND,
-	SET_XOR,
-	SET_OR,
-
-	// binary op
-	SHR,
-	SHL,
-	LOGAND,
-	LOGOR,
-	N_LE,
-	N_GE,
-	N_EQ,
-	N_NE,
-	N_LT,
-	N_GT,
-	ADD,
-	SUB,
-	MUL,
-	DIV,
-	MOD,
-	AND,
-	OR,
-	XOR,
-
-	// unary op
-	UN_INC,
-	UN_DEC,
-	LOGNOT,
-	NOT,
-	NEG,
-	REF,
-	PTR,
-
-	// postfix exp
-	POST_INC,
-	POST_DEC,
-
-	FUNC,
-	CALL,
-	RET,
-	COND,
-	VAR,
-	BREAK,
-	CONT,
-	INT_CONST,
-
-	NODE_COUNT
-};
+#include <defs.hpp>
 
 struct AST {
 	NodeType type;
+	PrimType ptype;
 	AST *lhs, *mid, *rhs;
 
 	int val;
@@ -103,36 +36,36 @@ struct AST {
 		// none are avaiable, add ast to bottom of tree
 		else
 		{
-			AST *new_bottom = new AST(t, node);
+			AST *new_bottom = new AST(t, INT, node);
 			bottom->rhs = new_bottom;
 			return new_bottom;
 		}
 	}
 
 	// generic constructors
-	AST(NodeType type, AST *lhs, AST *mid, AST *rhs)
-		: type(type), lhs(lhs), mid(mid), rhs(rhs), val(0) {}
+	AST(NodeType type, PrimType p, AST *lhs, AST *mid, AST *rhs)
+		: type(type), ptype(p), lhs(lhs), mid(mid), rhs(rhs), val(0) {}
 
-	AST(NodeType type, AST *lhs, AST *rhs)
-		: type(type), lhs(lhs), mid(nullptr), rhs(rhs) {}
+	AST(NodeType type, PrimType p, AST *lhs, AST *rhs)
+		: AST(type, p, lhs, nullptr, rhs) {}
 
-	AST(NodeType type, AST *lhs)
-		: AST(type, lhs, nullptr, nullptr) {}
+	AST(NodeType type, PrimType p, AST *lhs)
+		: AST(type, p, lhs, nullptr, nullptr) {}
 
 	AST(NodeType type)
-		: AST(type, nullptr, nullptr, nullptr) {}
+		: AST(type, INT, nullptr, nullptr, nullptr) {}
 
 	// val leaf
-	AST(NodeType type, int val)
-		: type(type), lhs(nullptr), mid(nullptr), rhs(nullptr), val(val) {}
+	AST(NodeType type, PrimType p, int val)
+		: type(type), ptype(p), lhs(nullptr), mid(nullptr), rhs(nullptr), val(val) {}
 
 	// var
-	AST(int entry, int scope_id)
-		: type(VAR), lhs(nullptr), mid(nullptr), rhs(nullptr), val(entry), scope_id(scope_id) {}
+	AST(PrimType p, int entry, int scope_id)
+		: type(VAR), ptype(p), lhs(nullptr), mid(nullptr), rhs(nullptr), val(entry), scope_id(scope_id) {}
 
 	// to be safe
 	AST()
-		: lhs(nullptr), mid(nullptr), rhs(nullptr) {}
+		: lhs(nullptr), mid(nullptr), rhs(nullptr), val(0) {}
 };
 
 class ASTIter {
@@ -216,8 +149,6 @@ class Parser
 	AST *primary();
 	AST *call();
 
-	void parse_err(const std::string &msg, const Token &err_tok);
-
 public:
 	Parser(Lexer &l)
 		: l(l)
@@ -230,4 +161,5 @@ public:
 	AST *parse();
 
 	static NodeType asnode(TokType t);
+	static PrimType asptype(TokType t);
 };

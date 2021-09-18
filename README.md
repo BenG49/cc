@@ -32,10 +32,20 @@ The least optimized compiler you'll ever see.
 			- lea foo(%rip)
 		- dereference (\*)
 			- load ptr into register, use register as mem addr
-- assign all evaluatable nodes (binop, unop, const) size
-	- maybe after parsing
-	- add implicit cast warnings, keep track of pointer depth (char **arr)
 - test break after nested for looop
+
+- assign all evaluatable nodes (binop, unop, const) size
+	- add implicit cast warnings, keep track of pointer depth (char **arr)
+
+char + char = char		no widening
+int + char = int		widen rhs
+char + int = int		widen lhs
+int + int = int			no widening
+
+char a = char b		no widening
+int a  = char b		widen rhs
+char a = int b		truncate lhs
+int a  = int b		no widening
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
 

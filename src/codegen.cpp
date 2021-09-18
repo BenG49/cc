@@ -1,5 +1,7 @@
 #include <codegen.hpp>
-#include <parser.hpp>
+
+#include <types.hpp>
+#include <err.hpp>
 
 // true=free, false=allocated
 bool free_regs[SCRATCH_COUNT] = { true };
@@ -19,12 +21,6 @@ Size getsize(TokType t)
 
 int lbl_n = 1;
 
-void cg_err(const std::string &err)
-{
-	std::cerr << err << '\n';
-	exit(1);
-}
-
 // -------- register allocation -------- //
 
 Reg alloc_reg()
@@ -38,7 +34,7 @@ Reg alloc_reg()
 		}
 	}
 
-	cg_err("Ran out of registers");
+	err("Ran out of registers");
 	// supress return type warning
 	return NOREG;
 }
@@ -46,7 +42,7 @@ Reg alloc_reg()
 void free_reg(Reg reg)
 {
 	if (free_regs[reg])
-		cg_err("Attemted to free unallocated register");
+		err("Attemted to free unallocated register");
 	
 	free_regs[reg] = true;
 }
@@ -65,6 +61,9 @@ Reg gen_ast(AST *n, Ctx c)
 {
 	if ((n->type >= SET && n->type <= SET_OR) || n->type == DECL_SET)
 	{
+		// test widening types
+		compat_types(n->lhs->get_sym().type, &n->rhs);
+
 		Reg rval = gen_ast(n->rhs, Ctx(c, n->type));
 
 		if (n->type != SET && n->type != DECL_SET)
@@ -85,19 +84,14 @@ Reg gen_ast(AST *n, Ctx c)
 			add_globl(n->lhs->get_sym(), n->rhs);
 			return NOREG;
 		}
+		else
 			// get rvalue, set lvalue
 			return set_var(rval, n->lhs->get_sym());
 	}
 
 	switch (n->type) {
-		case FUNC:
-			if (n->rhs)
-			{
-				emit_func_hdr(n->lhs->get_sym(), n->val);
-				gen_ast(n->rhs, Ctx(c, n->type));
-				emit_epilogue();
-			}
-			return NOREG;
+		case WIDEN:
+			return emit_widen(p_sizeof(n->lhs->ptype), p_sizeof(n->ptype), gen_ast(n->lhs, c));
 		case LIST:
 			if (n->lhs) {
 				gen_ast(n->lhs, Ctx(c, LIST));
@@ -119,6 +113,15 @@ Reg gen_ast(AST *n, Ctx c)
 
 			return NOREG;
 
+		case FUNC:
+			if (n->rhs)
+			{
+				emit_func_hdr(n->lhs->get_sym(), n->val);
+				gen_ast(n->rhs, Ctx(c, n->type));
+				emit_epilogue();
+			}
+			return NOREG;
+
 		case DECL:
 			if (n->lhs->get_sym().vtype == V_GLOBL)
 				add_globl(n->lhs->get_sym(), n->rhs);
@@ -128,8 +131,6 @@ Reg gen_ast(AST *n, Ctx c)
 		case IF:
 			gen_if(n, c);
 			return NOREG;
-		case COND:
-			return gen_cond(n, c);
 		case FOR:
 		case FOR_DECL:
 			gen_for(n, c);
@@ -140,14 +141,16 @@ Reg gen_ast(AST *n, Ctx c)
 		case DO:
 			gen_do(n, c);
 			return NOREG;
+		case COND:
+			return gen_cond(n, c);
+		case CALL:
+			return gen_call(n, c);
 		case BREAK:
 			emit_jmp(UNCOND, c.breaklbl);
 			return NOREG;
 		case CONT:
 			emit_jmp(UNCOND, c.contlbl);
 			return NOREG;
-		case CALL:
-			return gen_call(n, c);
 
 		default: break;
 	}
@@ -168,6 +171,9 @@ Reg gen_ast(AST *n, Ctx c)
 	// binop
 	if (n->type >= SHR && n->type <= XOR)
 	{
+		if (!compat_types(n, false))
+			err(std::string("Incompatible types ") + PRIM_NAMES[n->lhs->ptype] + " and " + PRIM_NAMES[n->lhs->ptype]);
+
 		if (n->type == SUB || n->type == SHR || n->type == SHL)
 			return emit_binop(r, l, n->type);
 		else if (n->type == DIV || n->type == MOD)
@@ -198,14 +204,15 @@ Reg gen_ast(AST *n, Ctx c)
 	
 	switch (n->type) {
 		case INT_CONST:
-			return emit_int(n->val);
+			return emit_int(n->val, p_sizeof(n->ptype));
 
 		case POST_INC:
 		case POST_DEC:
 			return emit_post(l, n->type, n->lhs->get_sym());
 
 		case RET:
-			emit_ret(l, getsize(n->lhs->get_sym().type));
+			compat_types(n->lhs->get_sym().type, &n->lhs);
+			emit_ret(l, p_sizeof(n->lhs->get_sym().type));
 			free_all();
 			return NOREG;
 
@@ -226,7 +233,7 @@ Reg gen_ast(AST *n, Ctx c)
 void add_globl(const Sym &s, AST *val)
 {
 	if (val && val->type != INT_CONST)
-		cg_err("Global must be initialized with constant");
+		err("Global must be initialized with constant");
 	
 	for (unsigned i = 0; i < globls.size(); ++i)
 		// forward global declaration

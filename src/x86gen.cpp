@@ -1,5 +1,8 @@
 #include <codegen.hpp>
 
+#include <types.hpp>
+#include <err.hpp>
+
 // -------- codegen -------- //
 
 const char *REGS[4][COUNT] = {
@@ -44,10 +47,10 @@ void emit_mov(Reg src, int offset, Size s)
 	out << "(%rbp)\n";
 }
 
-Reg emit_int(int val)
+Reg emit_int(int val, Size s)
 {
 	Reg r = alloc_reg();
-	out << "\tmovq $" << val << ", " << REGS[Quad][r] << '\n';
+	out << '\t' << MOV[s] << '$' << val << ", " << REGS[s][r] << '\n';
 	return r;
 }
 
@@ -59,6 +62,12 @@ void emit_push(Reg r)
 void emit_pop(Reg r)
 {
 	out << "\tpop " << REGS[Quad][r] << '\n';
+}
+
+// yes
+Reg emit_widen(Size oldtype, Size newtype, Reg r)
+{
+	return r;
 }
 
 Reg emit_post(Reg val, NodeType op, const Sym &s)
@@ -107,8 +116,8 @@ Reg emit_unop(Reg val, NodeType op)
 Reg emit_binop(Reg src, Reg dst, NodeType op)
 {
 	if (op == SHR || op == SHL)
-		// arg 3 = rcx
-		src = emit_mov(src, A3, Quad);
+		// arg 3 = cl
+		src = emit_mov(src, A3, Byte);
 
 	switch (op) {
 		case SET_ADD:
@@ -236,7 +245,7 @@ Reg load_var(const Sym &s)
 {
 	Reg r = alloc_reg();
 
-	Size sz = getsize(s.type);
+	Size sz = p_sizeof(s.type);
 
 	out << '\t' << MOV[sz];
 
@@ -261,7 +270,7 @@ Reg load_var(const Sym &s)
 
 Reg set_var(Reg r, const Sym &s)
 {
-	Size sz = getsize(s.type);
+	Size sz = p_sizeof(s.type);
 
 	out << '\t' << MOV[sz] << REGS[sz][r] << ", ";
 
@@ -284,6 +293,7 @@ Reg set_var(Reg r, const Sym &s)
 	return r;
 }
 
+// TODO: use .comm
 void gen_globls()
 {
 	if (globls.size())
@@ -295,9 +305,9 @@ void gen_globls()
 
 		// initialized var
 		if (!p.second)
-			out << ".zero " << (1 << getsize(p.first.type)) << '\n';
+			out << ".zero " << (1 << p_sizeof(p.first.type)) << '\n';
 		else
-			out << GLOBL_ALLOC[getsize(p.first.type)] << ' ' << p.second->val << '\n';
+			out << GLOBL_ALLOC[p_sizeof(p.first.type)] << ' ' << p.second->val << '\n';
 	}
 }
 
@@ -341,7 +351,7 @@ void init_cg(const std::string &filename)
 	out.open(filename);
 
 	if (!out)
-		cg_err("Output file failed to open");
+		err("Output file failed to open");
 	
 	free_all();
 }
