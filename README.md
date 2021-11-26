@@ -20,7 +20,7 @@ The least optimized compiler you'll ever see.
 - support lvalues not just being identifiers (pointers)
 - add comma operator (have to make it lower precedence than =)
 	- honestly almost never used
-- move function redefinition + param count error checking out of parser
+- move function redefinition & param count error checking out of parser
 - missing features
 	- void, float
 	- pointers (arrays, strings)
@@ -33,9 +33,7 @@ The least optimized compiler you'll ever see.
 		- dereference (\*)
 			- load ptr into register, use register as mem addr
 - test break after nested for looop
-
-- assign all evaluatable nodes (binop, unop, const) size
-	- add implicit cast warnings, keep track of pointer depth (char **arr)
+- keep track of pointer depth (char **arr)
 
 char + char = char		no widening
 int + char = int		widen rhs
@@ -48,6 +46,7 @@ char a = int b		truncate lhs
 int a  = int b		no widening
 
 https://norasandler.com/2017/11/29/Write-a-Compiler.html
+https://github.com/DoctorWkt/acwj
 
 http://www.quut.com/c/ANSI-C-grammar-y-1999.html
 http://www.quut.com/c/ANSI-C-grammar-l-1999.html
