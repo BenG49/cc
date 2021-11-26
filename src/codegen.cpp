@@ -10,9 +10,10 @@ std::vector<std::pair<Sym, AST *>> globls;
 Size getsize(TokType t)
 {
 	switch (t) {
-		case KEY_INT: return Size::Long;
-		case KEY_CHAR: return Size::Byte;
-		default: return Size::Quad;
+		case KEY_CHAR: 	return Byte;
+		case KEY_INT: 	return Long;
+		case KEY_LONG:
+		default: return Quad;
 	}
 }
 

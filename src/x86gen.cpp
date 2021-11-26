@@ -25,7 +25,7 @@ static const char *JMPS[7] = { "jg ", "jl ", "jne ", "je ", "jge ", "jle ", "jmp
 
 std::ofstream out;
 
-Reg emit_jmp(int type, int lbl)
+void emit_jmp(int type, int lbl)
 {
 	out << '\t' << JMPS[type] << 'L' << lbl << '\n';
 }
@@ -37,6 +37,8 @@ void emit_lbl(int lbl)
 
 Reg emit_mov(Reg src, Reg dst, Size s)
 {
+	if (s == Quad)
+		std::cout << "Quad mov\n";
 	if (src == dst)
 		return src;
 
@@ -342,14 +344,15 @@ void emit_func_hdr(const Sym &s, int offset)
 
 void emit_epilogue()
 {
-    out << "\txor %rax, %rax\n\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
+	out << "\txor %rax, %rax\n\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 
 void emit_ret(Reg r, Size s)
 {
-	if (r != RR)
+	// lets the register be rax or be empty return (in void function)
+	if (r != RR && r != NOREG)
 		out << '\t' << MOV[s] << REGS[s][r] << ", " << REGS[s][RR] << '\n';
-    out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
+	out << "\tmov %rbp, %rsp\n\tpop %rbp\n\tret\n";
 }
 
 void init_cg(const std::string &filename)

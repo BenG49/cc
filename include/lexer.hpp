@@ -18,6 +18,7 @@
 	DEF(KEY_FOR, "for")           \
 	DEF(KEY_IF, "if")             \
 	DEF(KEY_INT, "int")           \
+	DEF(KEY_LONG, "long")         \
 	DEF(KEY_RETURN, "return")     \
 	DEF(KEY_SIZEOF, "sizeof")     \
 	DEF(KEY_STRUCT, "struct")     \

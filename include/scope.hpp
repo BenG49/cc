@@ -8,39 +8,39 @@
 enum VarType { V_GLOBL, V_VAR, V_REG, V_FUNC };
 
 struct Sym {
-    VarType vtype;
-    PrimType type;
-    std::string name;
-    int val;
+	VarType vtype;
+	PrimType type;
+	std::string name;
+	int val;
 
-    Sym(VarType vtype, PrimType type, const std::string &name)
-        : vtype(vtype), type(type), name(name), val(0) {}
-    Sym(VarType vtype, PrimType type, const std::string &name, int val)
-        : vtype(vtype), type(type), name(name), val(val) {}
+	Sym(VarType vtype, PrimType type, const std::string &name)
+		: vtype(vtype), type(type), name(name), val(0) {}
+	Sym(VarType vtype, PrimType type, const std::string &name, int val)
+		: vtype(vtype), type(type), name(name), val(val) {}
 };
 
 struct AST;
 
 struct Scope {
-    int parent_id;
-    int id;
+	int parent_id;
+	int id;
 
-    int size;
+	int size;
 
-    std::vector<Sym> syms;
+	std::vector<Sym> syms;
 
-    // entry, id
-    AST *get(const std::string &name);
-    bool in_scope(const std::string &name);
+	// entry, id
+	AST *get(const std::string &name);
+	bool in_scope(const std::string &name);
 
 
-    // static functions
-    static int new_scope(int cur);
-    static Scope *s(int id) { return scopes[id]; };
+	// static functions
+	static int new_scope(int cur);
+	static Scope *s(int id) { return scopes[id]; };
 
-    static const int GLOBAL = 0;
+	static const int GLOBAL = 0;
 
 private:
-    static std::vector<Scope*> scopes;
-    static int scope_count;
+	static std::vector<Scope*> scopes;
+	static int scope_count;
 };

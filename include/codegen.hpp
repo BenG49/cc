@@ -9,6 +9,7 @@
 #include <scope.hpp>
 
 enum Reg : int8_t;
+// 1, 2, 4, 8 bytes
 enum Size { Byte, Word, Long, Quad };
 enum Idx { LE, GE, EQ, NE, LT, GT, UNCOND };
 
@@ -49,7 +50,7 @@ int label();
 // -------- codegen -------- //
 
 // etc
-Reg emit_jmp(int type, int lbl);
+void emit_jmp(int type, int lbl);
 void emit_lbl(int lbl);
 Reg emit_mov(Reg src, Reg dst, Size s);
 void emit_mov(Reg src, int offset, Size s);

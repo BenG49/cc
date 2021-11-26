@@ -6,7 +6,7 @@
 
 static bool is_type(TokType t)
 {
-	return t == KEY_BOOL || t == KEY_CHAR || t == KEY_INT || t == KEY_FLOAT || t == KEY_VOID;
+	return t == KEY_BOOL || t == KEY_CHAR || t == KEY_INT || t == KEY_FLOAT || t == KEY_VOID || t == KEY_LONG;
 }
 
 static bool is_assign(TokType t)
@@ -46,7 +46,7 @@ AST *Parser::stmt()
 	switch (l.pnxt().type) {
 		case KEY_RETURN:
 			l.eat(KEY_RETURN);
-			out = new AST(RET, INT, expr());
+			out = new AST(RET, INT, exp_option());
 			break;
 		case KEY_IF:
 			out = if_stmt();
@@ -729,6 +729,7 @@ PrimType Parser::asptype(TokType t)
 		case INT_CONSTANT:	return INT;
 		case KEY_CHAR:
 		case CHAR_CONSTANT:	return CHAR;
+		case KEY_LONG: 		return LONG;
 		default: return INT;
 	}
 }

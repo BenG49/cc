@@ -1,8 +1,26 @@
 #!/usr/bin/env bash
 
 # https://stackoverflow.com/questions/59895/how-can-i-get-the-source-directory-of-a-bash-script-from-within-the-script-itsel
-cc_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cc_path="$(cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
 
 $cc_path/cc.out $1 &&
 gcc out.s -g -o ${1%.*}
-# && rm out.s
+
+# test against gcc
+if [[ $# -gt 1 && $2 == "--test" ]]; then
+	gcc $1 -o test.out &&
+
+	eval ./${1%.*}
+	code=$?
+
+	eval ./test.out
+	real=$?
+
+	if [[ $code -ne $real ]]; then
+		echo "test failed: expected ${real}, got ${code}"
+	else
+		echo "test passed with ${code}"
+	fi
+
+	rm -f test.out
+fi
