@@ -60,6 +60,7 @@ int label() { return lbl_n++; }
 
 Reg gen_ast(AST *n, Ctx c)
 {
+	// assignment operators
 	if ((n->type >= SET && n->type <= SET_OR) || n->type == DECL_SET)
 	{
 		// test widening types
@@ -90,6 +91,7 @@ Reg gen_ast(AST *n, Ctx c)
 			return set_var(rval, n->lhs->get_sym());
 	}
 
+	// non-binary operations
 	switch (n->type) {
 		case WIDEN:
 			return emit_widen(p_sizeof(n->lhs->ptype), p_sizeof(n->ptype), gen_ast(n->lhs, c));

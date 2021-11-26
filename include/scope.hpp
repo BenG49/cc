@@ -11,6 +11,9 @@ struct Sym {
 	VarType vtype;
 	PrimType type;
 	std::string name;
+	// param count for V_FUNC
+	// if assigned or not for V_GLOBL
+	// offset if V_VAR
 	int val;
 
 	Sym(VarType vtype, PrimType type, const std::string &name)
@@ -25,6 +28,7 @@ struct Scope {
 	int parent_id;
 	int id;
 
+	// total bytes of all vars
 	int size;
 
 	std::vector<Sym> syms;

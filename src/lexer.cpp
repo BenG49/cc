@@ -77,7 +77,7 @@ Lexer::~Lexer()
 
 Token Lexer::eat(TokType expected)
 {
-	Token next = pnxt();
+	Token next = peek();
 	if (next.type != expected)
 	{
 		if (expected == SEMI)
@@ -503,7 +503,6 @@ void Lexer::lex_err(const std::string &msg)
 	exit(1);
 }
 
-Token Lexer::pnxt() { return Lexer::peek(1); }
 Token Lexer::peek(unsigned lookahead)
 {
 	// token doesn't exist in buffer

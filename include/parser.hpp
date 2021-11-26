@@ -9,9 +9,12 @@
 
 struct AST {
 	NodeType type;
+	// every node has a primitive type
 	PrimType ptype;
 	AST *lhs, *mid, *rhs;
 
+	// used for byte count of vars for scope ast
+	// used for symbol id for variable ast
 	int val;
 	int scope_id;
 
@@ -68,6 +71,7 @@ struct AST {
 		: lhs(nullptr), mid(nullptr), rhs(nullptr), val(0) {}
 };
 
+// iterator for ease of use, goes through list asts
 class ASTIter {
 	const AST *cur;
 	int n;
@@ -105,14 +109,14 @@ public:
 	}
 };
 
-// -------- class def -------- //
+// -------- parser class -------- //
 
 class Parser
 {
 	Lexer &l;
 
 	// context
-	int cur_scope;
+	int cur_scope; // used to set scope of new asts
 	int offset;
 	int stk_size;
 	bool in_loop;

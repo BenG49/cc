@@ -31,7 +31,7 @@ AST *Parser::expr()
 // [ expr ]
 AST *Parser::exp_option()
 {
-	if (l.pnxt().type == SEMI || l.pnxt().type == RPAREN)
+	if (l.peek().type == SEMI || l.peek().type == RPAREN)
 		return new AST(NONE);
 	else
 		return expr();
@@ -43,7 +43,7 @@ AST *Parser::stmt()
 	AST *out;
 	bool semi = true;
 
-	switch (l.pnxt().type) {
+	switch (l.peek().type) {
 		case KEY_RETURN:
 			l.eat(KEY_RETURN);
 			out = new AST(RET, INT, exp_option());
@@ -66,13 +66,13 @@ AST *Parser::stmt()
 			break;
 		case KEY_BREAK:
 			if (!in_loop)
-				err_tok("Break cannot appear outside of loop body", l.pnxt());
+				err_tok("Break cannot appear outside of loop body", l.peek());
 			l.eat(KEY_BREAK);
 			out = new AST(BREAK);
 			break;
 		case KEY_CONT:
 			if (!in_loop)
-				err_tok("Continue cannot appear outside of loop body", l.pnxt());
+				err_tok("Continue cannot appear outside of loop body", l.peek());
 			l.eat(KEY_CONT);
 			out = new AST(CONT);
 			break;
@@ -103,7 +103,7 @@ AST *Parser::func()
 	AST *out = new AST(FUNC);
 	out->mid = new AST(LIST);
 
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType t = tok.type;
 	if (!is_type(t))
 		err_tok("Expected function return type", tok);
@@ -133,7 +133,7 @@ AST *Parser::func()
 	Scope *cur = Scope::s(cur_scope);
 	AST *bottom = out->mid;
 
-	tok = l.pnxt();
+	tok = l.peek();
 	t = tok.type;
 	while (t != RPAREN)
 	{
@@ -157,10 +157,10 @@ AST *Parser::func()
 
 		++param_count;
 
-		if (l.pnxt().type != RPAREN)
+		if (l.peek().type != RPAREN)
 			l.eat(COMMA);
 
-		tok = l.pnxt();
+		tok = l.peek();
 		t = tok.type;
 	}
 
@@ -187,7 +187,7 @@ AST *Parser::func()
 
 	l.eat(RPAREN);
 
-	if (l.pnxt().type == SEMI)
+	if (l.peek().type == SEMI)
 	{
 		l.eat(SEMI);
 		cur_scope = cur->parent_id;
@@ -207,7 +207,7 @@ AST *Parser::decl()
 {
 	bool globl = cur_scope == 0;
 
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType type = tok.type;
 	if (is_type(type))
 		l.eat(type);
@@ -220,7 +220,7 @@ AST *Parser::decl()
 
 	AST *out = new AST(DECL, t, new AST(t, Scope::s(cur_scope)->syms.size(), cur_scope));
 
-	bool assigned = l.pnxt().type == OP_SET;
+	bool assigned = l.peek().type == OP_SET;
 
 	// two calls to a linear search, not good
 	if (Scope::s(cur_scope)->in_scope(name))
@@ -281,7 +281,7 @@ AST *Parser::if_stmt()
 
 	out->mid = stmt();
 
-	if (l.pnxt().type == KEY_ELSE)
+	if (l.peek().type == KEY_ELSE)
 	{
 		l.eat(KEY_ELSE);
 
@@ -302,7 +302,7 @@ AST *Parser::for_stmt()
 	AST *child = new AST(FOR);
 	out->rhs = child;
 
-	bool declaration = is_type(l.pnxt().type);
+	bool declaration = is_type(l.peek().type);
 
 	out->type = declaration ? FOR_DECL : FOR;
 
@@ -398,7 +398,7 @@ AST *Parser::compound(bool newscope)
 
 	l.eat(LBRAC);
 
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType t = tok.type;
 	while (t != RBRAC)
 	{
@@ -407,7 +407,7 @@ AST *Parser::compound(bool newscope)
 		else
 			bottom = AST::append(bottom, stmt(), LIST);
 		
-		tok = l.pnxt();
+		tok = l.peek();
 		t = tok.type;
 	}
 
@@ -431,6 +431,7 @@ AST *Parser::compound(bool newscope)
 // IDENTIFIER
 AST *Parser::lval()
 {
+	// get the var with the name of the identifier token from the cur scope
 	return Scope::s(cur_scope)->get(std::get<std::string>(l.eat(IDENTIFIER).val));
 }
 
@@ -440,7 +441,7 @@ AST *Parser::assign()
 {
 	AST *lv = lval();
 
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType t = tok.type;
 	if (!is_assign(t))
 		err_tok("Expected assignment operator", tok);
@@ -462,7 +463,7 @@ AST *Parser::assign()
 	AST *Parser::func()                                                                        \
 	{                                                                                          \
 		AST *out = call_func();                                                                \
-		TokType t = l.pnxt().type;                                                             \
+		TokType t = l.peek().type;                                                             \
                                                                                                \
 		while (type_eval)                                                                      \
 		{                                                                                      \
@@ -471,7 +472,7 @@ AST *Parser::assign()
 			out = new AST(node,                                                                \
 						  (p_sizeof(out->ptype) > p_sizeof(c->ptype)) ? out->ptype : c->ptype, \
 						  out, c);                                                             \
-			t = l.pnxt().type;                                                                 \
+			t = l.peek().type;                                                                 \
 		}                                                                                      \
                                                                                                \
 		return out;                                                                            \
@@ -481,7 +482,7 @@ AST *Parser::assign()
 	AST *Parser::func()                                                                        \
 	{                                                                                          \
 		AST *out = call_func();                                                                \
-		TokType t = l.pnxt().type;                                                             \
+		TokType t = l.peek().type;                                                             \
                                                                                                \
 		while (type_eval)                                                                      \
 		{                                                                                      \
@@ -490,7 +491,7 @@ AST *Parser::assign()
 			out = new AST(Parser::asnode(t),                                                   \
 						  (p_sizeof(out->ptype) > p_sizeof(c->ptype)) ? out->ptype : c->ptype, \
 						  out, c);                                                             \
-			t = l.pnxt().type;                                                                 \
+			t = l.peek().type;                                                                 \
 		}                                                                                      \
                                                                                                \
 		return out;                                                                            \
@@ -501,7 +502,7 @@ AST *Parser::cond()
 {
 	AST *c = op_or();
 
-	if (l.pnxt().type == OP_COND)
+	if (l.peek().type == OP_COND)
 	{
 		l.eat(OP_COND);
 
@@ -549,7 +550,7 @@ BINEXP_ASNODE(factor, unop, t == OP_DIV || t == OP_MUL || t == OP_MOD)
 // lhs = operand
 AST *Parser::unop()
 {
-	TokType t = l.pnxt().type;
+	TokType t = l.peek().type;
 
 	NodeType n;
 	bool lv = true;
@@ -579,7 +580,7 @@ AST *Parser::postfix()
 {
 	AST *p = primary();
 
-	TokType t = l.pnxt().type;
+	TokType t = l.peek().type;
 	if (t == OP_INC || t == OP_DEC)
 	{
 		l.eat(t);
@@ -592,7 +593,7 @@ AST *Parser::postfix()
 // call | INT_CONSTANT | FP_CONSTANT | STR_CONSTANT | CHAR_CONSTANT | IDENTIFIER | '(' expr ')'
 AST *Parser::primary()
 {
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType t = tok.type;
 
 	// if (t == INT_CONSTANT || t == FP_CONSTANT || t == STR_CONSTANT || t == CHAR_CONSTANT)
@@ -646,17 +647,17 @@ AST *Parser::call()
 	int param_count = 0;
 	AST *list_bottom = out->rhs;
 
-	Token tok = l.pnxt();
+	Token tok = l.peek();
 	TokType t = tok.type;
 	while (t != RPAREN)
 	{
 		list_bottom = AST::append(list_bottom, expr(), LIST);
 		++param_count;
 
-		if (l.pnxt().type != RPAREN)
+		if (l.peek().type != RPAREN)
 			l.eat(COMMA);
 		
-		tok = l.pnxt();
+		tok = l.peek();
 		t = tok.type;
 	}
 
@@ -681,7 +682,7 @@ AST *Parser::parse()
 
 	TokType t = l.peek(3).type;
 
-	while (l.pnxt().type)
+	while (l.peek().type)
 	{
 		if (t == LPAREN)
 			bottom = AST::append(bottom, func(), LIST);

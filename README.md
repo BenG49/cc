@@ -32,7 +32,7 @@ The least optimized compiler you'll ever see.
 			- lea foo(%rip)
 		- dereference (\*)
 			- load ptr into register, use register as mem addr
-- test break after nested for looop
+- test break after nested for loop
 - keep track of pointer depth (char **arr)
 
 char + char = char		no widening

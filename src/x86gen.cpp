@@ -37,8 +37,6 @@ void emit_lbl(int lbl)
 
 Reg emit_mov(Reg src, Reg dst, Size s)
 {
-	if (s == Quad)
-		std::cout << "Quad mov\n";
 	if (src == dst)
 		return src;
 
@@ -235,8 +233,10 @@ Reg logic_or_set(Reg a, AST *b, Ctx c)
 
 void cond_jmp(AST *n, Ctx c)
 {
+	// get node's value
 	Reg r = gen_ast(n, c);
 
+	// really not sure what this does - are these supposed to be &&?
 	if (n->type < SHR || n->type > XOR || n->type < N_LE || n->type > N_GT)
 	{
 		out << "\ttest " << REGS[Quad][r] << ", " << REGS[Quad][r] << '\n';

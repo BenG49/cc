@@ -5,6 +5,7 @@
 #include <string>
 #include <deque>
 
+// easier to type - multi char tokens
 #define TOKS                      \
 	DEF(KEY_BOOL, "bool")         \
 	DEF(KEY_BREAK, "break")       \
@@ -93,6 +94,7 @@ struct Token
 
 	int line, col, char_count;
 
+	// union of potential token values
 	std::variant<long long, double, std::string> val;
 
 	Token(TokType type, int line, int col, int char_count)
@@ -115,10 +117,13 @@ class Lexer
 	char *buf;
 	std::deque<Token> tok_buf;
 
-public:
+	// generate next token
 	Token next();
+	// move index forward by count
 	int count(int count);
+	// check if keyword exists at index
 	bool keyword(const char *keyword);
+	// check if blockcomment is unterminated
 	void blockcomment();
 
 public:
@@ -127,11 +132,10 @@ public:
 	Lexer(const std::string &filename);
 	~Lexer();
 
+	// remove token from stream, error if unexpected
 	Token eat(TokType expected);
-	// peek next
-	Token pnxt();
-	// lookahead must be > 0
-	Token peek(unsigned lookahead);
+	// peek at next tokens without removing, default is next token
+	Token peek(unsigned lookahead = 1);
 
 	static const char *getname(TokType t);
 };
