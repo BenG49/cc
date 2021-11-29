@@ -37,7 +37,7 @@ int main(int argc, const char *argv[]) {
 	Parser p(l);
 	AST *ast = p.parse();
 
-	// prettyprint(ast, 0);
+	prettyprint(ast, 0);
 
 	init_cg("out.s");
 	gen_ast(ast, Ctx(NOREG, NONE, 0, 0, 0));

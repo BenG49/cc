@@ -2,8 +2,14 @@
 
 const char *PRIM_NAMES[P_COUNT] = {
 	"",
+	"void",
 	"int",
-	"char"
+	"char",
+	"long",
+	"void ptr",
+	"int ptr",
+	"char ptr",
+	"long ptr",
 };
 
 // yes

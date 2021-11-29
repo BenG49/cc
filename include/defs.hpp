@@ -71,7 +71,10 @@ enum NodeType {
 };
 
 enum PrimType {
-	NO_WIDEN, VOID, INT, CHAR, LONG, P_COUNT
+	NO_WIDEN,
+	VOID, INT, CHAR, LONG,
+	VOID_PTR, INT_PTR, CHAR_PTR, LONG_PTR,
+	P_COUNT
 };
 
 extern const char *PRIM_NAMES[P_COUNT];

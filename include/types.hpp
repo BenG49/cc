@@ -15,3 +15,6 @@ struct AST;
 bool compat_types(AST *parent, bool assigning);
 bool compat_types(PrimType out, AST **in);
 Size p_sizeof(PrimType t);
+
+PrimType pointer_type(PrimType t);
+

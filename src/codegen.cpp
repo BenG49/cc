@@ -7,17 +7,6 @@
 bool free_regs[FIRST_ARG] = { true };
 std::vector<std::pair<Sym, AST *>> globls;
 
-Size getsize(TokType t)
-{
-	switch (t) {
-		case KEY_CHAR: 	return Byte;
-		case KEY_INT: 	return Long;
-		case KEY_LONG:
-		default: return Quad;
-	}
-}
-
-
 // vars
 
 int lbl_n = 1;

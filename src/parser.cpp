@@ -202,23 +202,32 @@ AST *Parser::func()
 	return out;
 }
 
-// type IDENTIFIER [ '=' expr ] ';'
+// type *['*'] IDENTIFIER [ '=' expr ] ';'
 AST *Parser::decl()
 {
-	bool globl = cur_scope == 0;
+	bool globl = cur_scope == Scope::GLOBAL;
 
 	Token tok = l.peek();
-	TokType type = tok.type;
-	if (is_type(type))
-		l.eat(type);
-	else
+	TokType nxt = tok.type;
+	PrimType type = Parser::asptype(nxt);
+
+	if (!is_type(nxt))
 		err_tok("Expected variable type preceding declaration", tok);
 
+	l.eat(nxt);
+
+	// pointer
+	while (l.peek().type == OP_MUL)
+	{
+		type = pointer_type(type);
+		l.eat(OP_MUL);
+	}
+
 	Token id = l.eat(IDENTIFIER);
-	PrimType t = Parser::asptype(id.type);
+	// check if decl type and id type are the same here
 	std::string name = std::get<std::string>(id.val);
 
-	AST *out = new AST(DECL, t, new AST(t, Scope::s(cur_scope)->syms.size(), cur_scope));
+	AST *out = new AST(DECL, type, new AST(type, Scope::s(cur_scope)->syms.size(), cur_scope));
 
 	bool assigned = l.peek().type == OP_SET;
 
@@ -238,11 +247,11 @@ AST *Parser::decl()
 	}
 
 	if (globl)
-		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, Parser::asptype(type), name));
+		Scope::s(cur_scope)->syms.push_back(Sym(V_GLOBL, Parser::asptype(nxt), name));
 	else
 	{
-		int sz = 1 << getsize(type);
-		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, Parser::asptype(type), name, (offset -= sz)));
+		int sz = 1 << p_sizeof(type);
+		Scope::s(cur_scope)->syms.push_back(Sym(V_VAR, Parser::asptype(nxt), name, (offset -= sz)));
 		stk_size += sz;
 	}
 

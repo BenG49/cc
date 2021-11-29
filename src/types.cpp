@@ -50,9 +50,31 @@ bool compat_types(PrimType out, AST **in)
 Size p_sizeof(PrimType t)
 {
 	switch (t) {
-		case INT:   return Long;
 		case CHAR:  return Byte;
+		case INT:   return Long;
+		case CHAR_PTR:
+		case LONG_PTR:
+		case INT_PTR:
 		case LONG: 	return Quad;
-		default:	return Quad;
+		default:
+			err("Attempted to get size of invalid type");
 	}
+
+	// supress warning
+	return Byte;
+}
+
+PrimType pointer_type(PrimType t)
+{
+	switch (t) {
+		case VOID: return VOID_PTR;
+		case INT:  return INT_PTR;
+		case CHAR: return CHAR_PTR;
+		case LONG: return LONG_PTR;
+		default:
+			err("Invalid pointer_to type");
+	}
+
+	// supress warning
+	return VOID;
 }
